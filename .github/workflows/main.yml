@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-main:
-    if: ${{ github.repository == 'atlasmap/atlasmap' }}
+    if: ${{ github.repository == 'atlasmap/atlasmap' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
