@@ -20,6 +20,8 @@ jobs:
         with:
           java-version: 18
           distribution: 'temurin'
+      - name: Clean possibly corrupted Maven cache
+        run: rm -rf ~/.m2/repository
       - name: Cache Maven repo
         uses: actions/cache@v3
         with:
@@ -29,19 +31,4 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Build
         run: mvn --batch-mode -Pcoverage -Dwebdriver.chrome.driver=/usr/bin/chromedriver clean install
-      - name: Publish docs
-        run: sh publish-docs.sh
-        working-directory: docs
-      - name: Publish Docker Image
-        run: |
-          mvn --batch-mode -Pdocker \
-            -Dimage.tag.primary=latest \
-            -Djkube.docker.username=${{ secrets.DOCKER_USERNAME }} \
-            -Djkube.docker.password=${{ secrets.DOCKER_PASSWORD }} \
-            k8s:build k8s:push
-        working-directory: standalone
-      - name: Run codacy-coverage-reporter
-        uses: codacy/codacy-coverage-reporter-action@v1
-        with:
-          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-          coverage-reports: coverage-report/target/site/jacoco-aggregate/jacoco.xml,ui/packages/atlasmap-core/coverage/lcov.info,ui/packages/atlasmap/coverage/lcov.info,ui/packages/atlasmap-standalone/coverage/lcov.info
+      
