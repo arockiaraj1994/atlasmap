@@ -108,7 +108,8 @@ public class AtlasServiceTest {
     @Test
     public void testListMappings() throws Exception {
         Response resp = service.listMappings(
-                generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mappings"), null, null);
+                generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mappings"),
+                null, null, null);
         StringMap sMap = Json.mapper().readValue((byte[])resp.getEntity(), StringMap.class);
         LOG.info("Found " + sMap.getStringMapEntry().size() + " objects");
         for (StringMapEntry s : sMap.getStringMapEntry()) {
@@ -118,7 +119,7 @@ public class AtlasServiceTest {
 
     @Test
     public void testGetMapping() {
-        Response resp = service.getMappingRequest(JSON, 3);
+        Response resp = service.getMappingRequest(JSON, 3, null);
         assertEquals(204, resp.getStatus());
         assertNull(resp.getEntity());
     }
@@ -292,15 +293,16 @@ public class AtlasServiceTest {
     }
 
     @Test
-    public void testADMUpload() throws Exception {
-        InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("json-schema-source-to-xml-schema-target.adm");
-        Response res = service.createMappingRequest(in, MappingFileType.ZIP, 0,
-            generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mapping/ZIP/0"));
+    public void testJsonUpload() throws Exception {
+        InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("atlasmapping-actions.json");
+        Response res = service.createMappingRequest(in, MappingFileType.JSON, 0,
+            generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mapping/JSON/0"),
+            null);
         assertEquals(200, res.getStatus());
-        res = service.getMappingRequest(MappingFileType.JSON, 0);
+        res = service.getMappingRequest(MappingFileType.JSON, 0, null);
         assertEquals(200, res.getStatus());
         AtlasMapping mappings = mapper.readValue((byte[])res.getEntity(), AtlasMapping.class);
-        assertEquals(4, mappings.getMappings().getMapping().size());
+        assertEquals("UI.826533B", mappings.getName());
     }
 
     @Test

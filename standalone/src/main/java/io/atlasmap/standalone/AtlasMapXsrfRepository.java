@@ -47,17 +47,11 @@ public class AtlasMapXsrfRepository implements CsrfTokenRepository {
 
     @Override
     public CsrfToken loadToken(HttpServletRequest httpServletRequest) {
-        Optional<String> token = extractToken(httpServletRequest);
-        if (token.isPresent()) {
-            LOG.trace("Xsrf token found in request to uri {}. Value is: {}", httpServletRequest.getRequestURI(), token.get());
-        } else {
-            LOG.trace("Xsrf token not found in request to uri {}", httpServletRequest.getRequestURI());
-        }
+        Optional<String> token = Optional.ofNullable(httpServletRequest.getHeader(XSRF_HEADER_NAME));
+        token.ifPresentOrElse(
+            value -> LOG.trace("Xsrf token found in request to uri {}. Value is: {}", httpServletRequest.getRequestURI(), value),
+            () -> LOG.trace("Xsrf token not found in request to uri {}", httpServletRequest.getRequestURI())
+        );
         return token.map(val -> new DefaultCsrfToken(XSRF_HEADER_NAME, XSRF_HEADER_NAME, val)).orElse(null);
-    }
-
-    private Optional<String> extractToken(HttpServletRequest request) {
-        String token = request.getHeader(XSRF_HEADER_NAME);
-        return Optional.ofNullable(token);
     }
 }

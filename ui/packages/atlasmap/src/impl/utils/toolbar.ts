@@ -49,25 +49,18 @@ export async function deleteAtlasFile(fileId: string, isSource: boolean) {
 }
 
 /**
- * The user has requested their current mappings be exported.  Use the mapping management
- * service to establish the file content and to push it down to the server.
- *
- * @param fileName - user-specified ADM archive file name
+ * Export the current mappings as a JSON file via the runtime service.
  */
-export function exportADMArchiveFile(fileName: string) {
+export function exportMappingFile(fileName: string) {
   const cfg = ConfigModel.getConfig();
-  return cfg.fileService.exportADMArchive(fileName);
+  return cfg.fileService.exportMappings(fileName);
 }
 
 /**
- * Import an ADM archive file or a user JAR file.
- *
- * @param selectedFile
- * @param userFileSuffix
- * @param cfg
+ * Import a mapping JSON file.
  */
-export function importADMArchiveFile(selectedFile: File, cfg: ConfigModel) {
-  cfg.initializationService.initializeWithADMArchiveFile(selectedFile);
+export function importMappingFile(selectedFile: File, cfg: ConfigModel) {
+  cfg.initializationService.initializeWithMappingFile(selectedFile);
 }
 
 /**

@@ -17,13 +17,13 @@ package io.atlasmap.standalone;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Component
-public class RoutingConfiguration extends WebMvcConfigurerAdapter {
+public class RoutingConfiguration implements WebMvcConfigurer {
 
-    public void addViewControllers(final ViewControllerRegistry registry){
-        super.addViewControllers(registry);
+    @Override
+    public void addViewControllers(final ViewControllerRegistry registry) {
         registry.addViewController("/mapping-id/*").setViewName("forward:/");
     }
 }

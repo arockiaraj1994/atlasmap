@@ -18,20 +18,15 @@ import { ReactElement, useCallback } from 'react';
 import { useAtlasmap } from '../AtlasmapProvider';
 import { useConfirmationDialog } from './useConfirmationDialog';
 
-export function useImportADMArchiveDialog(): [
-  ReactElement,
-  (file: File) => void,
-] {
-  const { importADMArchiveFile } = useAtlasmap();
-  const [ImportADMArchiveDialog, openImportADMArchiveDialog] =
-    useConfirmationDialog(
-      'Import ADM archive file?',
-      'Importing a new ADM archive file will discard all unsaved changes. To save the current mappings, use the Export feature.',
-    );
-  const onImportADMArchive = useCallback(
-    (file: File) =>
-      openImportADMArchiveDialog(() => importADMArchiveFile(file)),
-    [importADMArchiveFile, openImportADMArchiveDialog],
+export function useImportMappingDialog(): [ReactElement, (file: File) => void] {
+  const { importMappingFile } = useAtlasmap();
+  const [ImportMappingDialog, openImportMappingDialog] = useConfirmationDialog(
+    'Import mapping file?',
+    'Importing a new mapping file will discard all unsaved changes. To save the current mappings, use the Export feature.',
   );
-  return [ImportADMArchiveDialog, onImportADMArchive];
+  const onImportMapping = useCallback(
+    (file: File) => openImportMappingDialog(() => importMappingFile(file)),
+    [importMappingFile, openImportMappingDialog],
+  );
+  return [ImportMappingDialog, onImportMapping];
 }

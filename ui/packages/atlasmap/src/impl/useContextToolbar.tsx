@@ -39,7 +39,7 @@ export type Views =
   | 'FreeView';
 
 export interface IUseContextToolbarHandlers {
-  onImportADMArchiveFile: (file: File) => void;
+  onImportMappingFile: (file: File) => void;
   onImportJarFile: (file: File) => void;
   onExportAtlasFile: () => void;
   onResetAtlasmap: () => void;
@@ -79,7 +79,7 @@ export function useContextToolbar({
   showToggleUnmappedFieldsToolbarItem = true,
   showAddNewMappingToolbarItem = true,
 
-  onImportADMArchiveFile,
+  onImportMappingFile,
   onImportJarFile,
   onExportAtlasFile,
   onResetAtlasmap,
@@ -116,7 +116,7 @@ export function useContextToolbar({
               showImportJarFileToolbarItem={showImportJarFileToolbarItem}
               showExportAtlasFileToolbarItem={showExportAtlasFileToolbarItem}
               showResetToolbarItem={showResetToolbarItem}
-              onImportAtlasFile={onImportADMArchiveFile}
+              onImportAtlasFile={onImportMappingFile}
               onImportJarFile={onImportJarFile}
               onExportAtlasFile={onExportAtlasFile}
               onResetAtlasmap={onResetAtlasmap}
@@ -199,7 +199,7 @@ export function useContextToolbar({
       showImportJarFileToolbarItem,
       showExportAtlasFileToolbarItem,
       showResetToolbarItem,
-      onImportADMArchiveFile,
+      onImportMappingFile,
       onImportJarFile,
       onExportAtlasFile,
       onResetAtlasmap,

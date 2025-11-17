@@ -300,7 +300,7 @@ describe('FileManagementService', () => {
       });
   });
 
-  test('importADMArchive()', (done) => {
+  test('importMappings()', (done) => {
     mockedKy.put = jest.fn().mockReturnValue(
       new (class {
         arrayBuffer(): Promise<ArrayBuffer> {
@@ -310,7 +310,7 @@ describe('FileManagementService', () => {
     );
     const binary = new TextEncoder().encode('dummy binary');
     service
-      .importADMArchive(new File([new Blob([binary])], 'dummy.adm'))
+      .importMappings(new File([new Blob([binary])], 'dummy.json'))
       .then((value) => {
         expect(value).toBeTruthy();
         done();
@@ -372,7 +372,7 @@ describe('FileManagementService', () => {
     });
   });
 
-  test('exportADMArchive()', (done) => {
+  test('exportMappings()', (done) => {
     // put digest file
     mockedKy.put = jest.fn().mockReturnValue(
       new (class {
@@ -381,13 +381,13 @@ describe('FileManagementService', () => {
         }
       })()
     );
-    // get ADM archive file
+    // get mapping json file
     mockedKy.get = jest.fn().mockReturnValue(
       new (class {
         arrayBuffer(): Promise<ArrayBuffer> {
           return Promise.resolve(
             fs.readFileSync(
-              `${__dirname}/../../../../test-resources/adm/mockdoc.adm`
+              `${__dirname}/../../../../test-resources/mapping/atlasmapping-split-collapse.json`
             )
           );
         }
@@ -420,7 +420,7 @@ describe('FileManagementService', () => {
     service.cfg.sourceDocs.push(srcCSVDoc);
     service.cfg.targetDocs.push(tgtDoc);
     service
-      .exportADMArchive('atlasmap-mapping.adm')
+      .exportMappings('atlasmap-mapping')
       .then((value) => {
         expect(value).toBeTruthy();
         done();
@@ -430,15 +430,14 @@ describe('FileManagementService', () => {
       });
   });
 
-  test('importADMArchive()', (done) => {
+  test('importMappings()', (done) => {
     mockedCommonUtil.readBinaryFile = jest
       .fn()
       .mockResolvedValue(
         fs.readFileSync(
-          `${__dirname}/../../../../test-resources/adm/mockdoc.adm`
+          `${__dirname}/../../../../test-resources/mapping/atlasmapping-split-collapse.json`
         )
       );
-    // put ADM archive file
     mockedKy.put = jest.fn().mockReturnValue(
       new (class {
         arrayBuffer(): Promise<ArrayBuffer> {
@@ -453,7 +452,7 @@ describe('FileManagementService', () => {
       `${__dirname}/../../../../test-resources/json/schema/mock-json-schema.json`
     );
     service
-      .importADMArchive(new File([new Blob([buf])], 'atlasmap-mapping.adm'))
+      .importMappings(new File([new Blob([buf])], 'atlasmap-mapping.json'))
       .then((value) => {
         expect(value).toBeTruthy();
         done();

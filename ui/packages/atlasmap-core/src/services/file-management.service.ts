@@ -35,13 +35,13 @@ import log from 'loglevel';
 
 export enum FileName {
   DIGEST = 'Mapping digest file',
-  ADM = 'ADM archive file',
+  MAPPING = 'Mapping JSON file',
   JAR = 'Jar file',
 }
 
 export enum FileType {
   DIGEST = 'GZ',
-  ADM = 'ZIP',
+  JSON = 'JSON',
   JAR = 'JAR',
 }
 
@@ -118,8 +118,8 @@ export class FileManagementService {
     });
   }
 
-  getCurrentADMArchive(): Promise<Uint8Array | null> {
-    return this.getCurrentFile(FileName.ADM, FileType.ADM);
+  getCurrentMappingJsonFile(): Promise<Uint8Array | null> {
+    return this.getCurrentFile(FileName.MAPPING, FileType.JSON);
   }
 
   private getCurrentFile(
@@ -328,16 +328,6 @@ export class FileManagementService {
     });
   }
 
-  private setADMArchiveFileToService(
-    compressedBuffer: BlobPart
-  ): Promise<boolean> {
-    const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/ZIP/';
-    const fileContent: Blob = new Blob([compressedBuffer], {
-      type: 'application/octet-stream',
-    });
-    return this.setBinaryFileToService(fileContent, url, FileName.ADM);
-  }
-
   /**
    * The user has either exported their mappings or imported new mappings.
    * Either way we're saving them on the server.
@@ -436,80 +426,71 @@ export class FileManagementService {
   }
 
   /**
-   * Update the current mapping files and export the ADM archive file with current mappings.
+   * Update the current mapping files and export the mapping JSON file with current mappings.
    *
    * Establish the mapping digest file content in JSON format (mappings + schema + instance-schema),
-   * compress it (GZIP), update the runtime, then fetch the full ADM archive ZIP file from the runtime
+   * compress it (GZIP), update the runtime, then fetch the mapping JSON file from the runtime
    * and export it.
    *
-   * @param event
+   * @param mappingsFileName
    */
-  exportADMArchive(mappingsFileName: string): Promise<boolean> {
+  exportMappings(mappingsFileName: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       this.updateDigestFile().then(() => {
-        // Fetch the full ADM archive file from the runtime (ZIP) and export it to to the local
-        // downloads area.
-        this.getCurrentADMArchive().then(async (value: Uint8Array | null) => {
-          // If value is null then no compressed mappings digest file is available on the server.
-          if (value === null) {
-            resolve(false);
-            return;
-          }
-          // Tack on a .adm suffix if one wasn't already specified.
-          if (mappingsFileName.split('.').pop() !== 'adm') {
-            mappingsFileName = mappingsFileName.concat('.adm');
-          }
-          const fileContent = new Blob([value], {
-            type: 'application/octet-stream',
-          });
-          CommonUtil.writeFile(fileContent, mappingsFileName)
-            .then((value2) => {
-              resolve(value2);
-            })
-            .catch((error) => {
-              this.cfg.errorService.addError(
-                new ErrorInfo({
-                  message: 'Unable to save the current data mappings.',
-                  level: ErrorLevel.ERROR,
-                  scope: ErrorScope.APPLICATION,
-                  type: ErrorType.INTERNAL,
-                  object: error,
-                })
-              );
+        this.getCurrentMappingJsonFile().then(
+          async (value: Uint8Array | null) => {
+            if (value === null) {
               resolve(false);
+              return;
+            }
+            if (mappingsFileName.split('.').pop() !== 'json') {
+              mappingsFileName = mappingsFileName.concat('.json');
+            }
+            const fileContent = new Blob([value], {
+              type: 'application/json',
             });
-        });
+            CommonUtil.writeFile(fileContent, mappingsFileName)
+              .then((value2) => {
+                resolve(value2);
+              })
+              .catch((error) => {
+                this.cfg.errorService.addError(
+                  new ErrorInfo({
+                    message: 'Unable to save the current data mappings.',
+                    level: ErrorLevel.ERROR,
+                    scope: ErrorScope.APPLICATION,
+                    type: ErrorType.INTERNAL,
+                    object: error,
+                  })
+                );
+                resolve(false);
+              });
+          }
+        );
       });
     });
   }
 
   /**
-   * Clean up all existing mappings, documents, libraries and import specified ADM archive file,
-   * push it to the runtime and reflect back in UI. The ADM file is in (ZIP) file format.
-   * Once pushed, we can retrieve from runtime the extracted compressed (GZIP) mappings
-   * digest file as well as the mappings JSON file.  These files exist separately for performance reasons.
-   *
-   * Once the runtime has its ADM archive file, digest file and mappings file set then restart the DM.
-   *
-   * @param mappingsFileName - ADM archive file
+   * Clean up all existing mappings, documents, libraries and import specified mapping JSON file,
+   * push it to the runtime and reflect back in UI.
    */
-  importADMArchive(admFile: File): Promise<boolean> {
+  importMappings(mappingFile: File): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       this.resetAll().then(() => {
         const reader = new FileReader();
-
-        // Turn the imported ADM file into a binary octet stream.
-        CommonUtil.readBinaryFile(admFile, reader)
+        CommonUtil.readBinaryFile(mappingFile, reader)
           .then((fileBin) => {
-            // Push the binary stream to the runtime.
-            this.setADMArchiveFileToService(fileBin).then((value) => {
+            const decoder = new TextDecoder();
+            const jsonString = decoder.decode(fileBin);
+            this.setMappingStringToService(jsonString).then((value) => {
               resolve(value);
             });
           })
           .catch((error) => {
             this.cfg.errorService.addError(
               new ErrorInfo({
-                message: `Unable to import the specified ADM file '${admFile.name}'`,
+                message: `Unable to import the specified mapping file '${mappingFile.name}'`,
                 level: ErrorLevel.ERROR,
                 scope: ErrorScope.APPLICATION,
                 type: ErrorType.INTERNAL,

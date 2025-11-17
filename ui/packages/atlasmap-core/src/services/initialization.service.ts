@@ -448,10 +448,10 @@ export class InitializationService {
     this.initializationStatusChangedSource.next();
   }
 
-  initializeWithADMArchiveFile(file: File): Promise<boolean> {
+  initializeWithMappingFile(file: File): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      this.updateLoadingStatus('Importing ADM archive file');
-      this.cfg.fileService.importADMArchive(file).then(() => {
+      this.updateLoadingStatus('Importing mapping file');
+      this.cfg.fileService.importMappings(file).then(() => {
         this.initialize().then((value) => {
           resolve(value);
         });

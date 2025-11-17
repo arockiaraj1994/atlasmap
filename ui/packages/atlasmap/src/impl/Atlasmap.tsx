@@ -109,9 +109,9 @@ export const Atlasmap: FunctionComponent<IAtlasmapProps> = ({
       showExportAtlasFileToolbarItem: allowExport,
       showResetToolbarItem: allowReset,
       ...toolbarOptions,
-      onImportADMArchiveFile: handlers.onImportADMArchive,
+      onImportMappingFile: handlers.onImportMappings,
       onImportJarFile: (file) => importJarFile(file),
-      onExportAtlasFile: handlers.onExportADMArchive,
+      onExportAtlasFile: handlers.onExportMappings,
       onResetAtlasmap: handlers.onResetAtlasmap,
       onAbout: handlers.onAbout,
     });

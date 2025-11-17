@@ -49,48 +49,69 @@ public class MappingFieldPairValidator {
     public void validateFieldTypes(List<Validation> validations, String mappingId, FieldGroup sourceFieldGroup, Field targetField) {
         FieldType actionOutputType = getActionOutputFieldType(validations, mappingId, sourceFieldGroup);
         for (Field sourceField : sourceFieldGroup.getField()) {
-            if (!service.matchDocIdOrNull(sourceField.getDocId())) {
-                return;
-            }
-            doValidateFieldTypes(validations, mappingId, sourceField, targetField,
-                    actionOutputType != null ? actionOutputType : sourceField.getFieldType());
+            FieldType effectiveSourceType = actionOutputType != null ? actionOutputType : sourceField.getFieldType();
+            validateFieldPair(validations, mappingId, sourceField, targetField, effectiveSourceType);
         }
     }
 
     public void validateFieldTypes(List<Validation> validations, String mappingId, List<Field> sourceFields, Field targetField) {
         for (Field sourceField : sourceFields) {
-            if (!service.matchDocIdOrNull(sourceField.getDocId())) {
-                return;
-            }
-            FieldType actionOutputType = getActionOutputFieldType(validations, mappingId, sourceField);
-            doValidateFieldTypes(validations, mappingId, sourceField, targetField,
-                    actionOutputType != null ? actionOutputType : sourceField.getFieldType());
+            validateFieldPair(validations, mappingId, sourceField, targetField);
         }
     }
 
     public void validateFieldTypes(List<Validation> validations, String mappingId, Field sourceField, List<Field> targetFields) {
-        if (!service.matchDocIdOrNull(sourceField.getDocId())) {
+        if (sourceField == null || !service.matchDocIdOrNull(sourceField.getDocId())) {
             return;
         }
-        FieldType actionOutputType = getActionOutputFieldType(validations, mappingId, sourceField);
+        FieldType actionOutputType = determineEffectiveSourceType(validations, mappingId, sourceField);
+        if (actionOutputType == null) {
+            return;
+        }
         for (Field targetField : targetFields) {
-            doValidateFieldTypes(validations, mappingId, sourceField, targetField,
-                    actionOutputType != null ? actionOutputType : sourceField.getFieldType());
+            doValidateFieldTypes(validations, mappingId, sourceField, targetField, actionOutputType);
         }
     }
 
     public void validateFieldTypes(List<Validation> validations, String mappingId, Field sourceField, Field targetField) {
+        validateFieldPair(validations, mappingId, sourceField, targetField);
+    }
+
+    private void validateFieldPair(List<Validation> validations, String mappingId, Field sourceField, Field targetField) {
+        validateFieldPair(validations, mappingId, sourceField, targetField, null);
+    }
+
+    private void validateFieldPair(List<Validation> validations, String mappingId, Field sourceField, Field targetField,
+            FieldType explicitSourceType) {
+        if (sourceField == null || targetField == null || !service.matchDocIdOrNull(sourceField.getDocId())) {
+            return;
+        }
+        FieldType effectiveSourceType = explicitSourceType != null
+                ? explicitSourceType
+                : determineEffectiveSourceType(validations, mappingId, sourceField);
+        if (effectiveSourceType == null) {
+            return;
+        }
+        doValidateFieldTypes(validations, mappingId, sourceField, targetField, effectiveSourceType);
+    }
+
+    private FieldType determineEffectiveSourceType(List<Validation> validations, String mappingId, Field sourceField) {
+        if (sourceField == null) {
+            return null;
+        }
         FieldType actionOutputType = getActionOutputFieldType(validations, mappingId, sourceField);
-        doValidateFieldTypes(validations, mappingId, sourceField, targetField,
-                actionOutputType != null ? actionOutputType : sourceField.getFieldType());
+        return actionOutputType != null ? actionOutputType : sourceField.getFieldType();
     }
 
     protected  void doValidateFieldTypes(List<Validation> validations, String mappingId, Field sourceField, Field targetField, FieldType sourceFieldType) {
-        if (sourceField == null && targetField == null || sourceField.getFieldType() == targetField.getFieldType()) {
+        if (sourceField == null || targetField == null) {
             return;
         }
         FieldType targetFieldType = targetField.getFieldType();
         if (sourceFieldType == null || targetFieldType == null) {
+            return;
+        }
+        if (sourceFieldType == targetFieldType) {
             return;
         }
         if (sourceFieldType == FieldType.ANY || targetFieldType == FieldType.ANY) {
@@ -108,7 +129,7 @@ public class MappingFieldPairValidator {
             validation.setId(mappingId);
             validation.setMessage(String.format(
                     "Conversion from '%s' to '%s' is required but no converter is available",
-                    sourceField.getFieldType(), targetField.getFieldType()));
+                    sourceFieldType, targetField.getFieldType()));
             validation.setStatus(ValidationStatus.ERROR);
             validations.add(validation);
         } else {

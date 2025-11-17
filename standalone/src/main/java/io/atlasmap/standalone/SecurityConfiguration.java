@@ -15,27 +15,34 @@
  */
 package io.atlasmap.standalone;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
-public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+public class SecurityConfiguration {
 
     private static final String DISABLE_FRAME_OPTIONS = "atlasmap.disable.frame.options";
-    @Autowired
-    private ApplicationContext context;
+    private final Environment environment;
 
-    @Override
-    protected void configure(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.csrf().csrfTokenRepository(new AtlasMapXsrfRepository());
-        String disableFrameOptions = context.getEnvironment().getProperty(DISABLE_FRAME_OPTIONS);
-        if (disableFrameOptions != null && "true".equals(disableFrameOptions)) {
-            httpSecurity.headers().frameOptions().disable();
+    public SecurityConfiguration(Environment environment) {
+        this.environment = environment;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        httpSecurity.csrf(csrf -> csrf.csrfTokenRepository(new AtlasMapXsrfRepository()));
+        if (isFrameOptionsDisabled()) {
+            httpSecurity.headers(headers -> headers.frameOptions().disable());
         }
+        return httpSecurity.build();
+    }
+
+    private boolean isFrameOptionsDisabled() {
+        return Boolean.parseBoolean(environment.getProperty(DISABLE_FRAME_OPTIONS));
     }
 }

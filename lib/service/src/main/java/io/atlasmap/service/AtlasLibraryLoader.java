@@ -26,10 +26,8 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -65,25 +63,23 @@ public class AtlasLibraryLoader extends CompoundClassLoader {
     }
 
     public void addJarFromStream(InputStream is) throws Exception {
-        File dest = new File(saveDir + File.separator + UUID.randomUUID().toString() + ".jar");
-        while (dest.exists()) {
-            dest = new File(saveDir + File.separator + UUID.randomUUID().toString() + ".jar");
-        }
-        FileOutputStream buffer = new FileOutputStream(dest);
-        int nRead;
-        byte[] data = new byte[1024];
-        while ((nRead = is.read(data, 0, data.length)) != -1) {
-            buffer.write(data, 0, nRead);
-        }
-        buffer.flush();
-        buffer.close();
-        List<URL> urls = new LinkedList<>();
-        urls.add(dest.toURI().toURL());
-        if (this.urlClassLoader != null) {
-            URL[] origUrls = this.urlClassLoader.getURLs();
-            urls.addAll(Arrays.asList(origUrls));
+        File dest = createUniqueJarFile();
+        try (FileOutputStream buffer = new FileOutputStream(dest)) {
+            byte[] data = new byte[8192];
+            int read;
+            while ((read = is.read(data)) != -1) {
+                buffer.write(data, 0, read);
+            }
         }
         reload();
+    }
+
+    private File createUniqueJarFile() {
+        File dest;
+        do {
+            dest = new File(saveDir, UUID.randomUUID().toString() + ".jar");
+        } while (dest.exists());
+        return dest;
     }
 
     public void clearLibraries() {
@@ -100,36 +96,38 @@ public class AtlasLibraryLoader extends CompoundClassLoader {
         if (!saveDir.exists() || !saveDir.isDirectory() || files == null) {
             return;
         }
-        for (File f : saveDir.listFiles()) {
+        for (File f : files) {
             try {
                 Files.delete(f.toPath());
-             } catch (Exception e) {
+            } catch (Exception e) {
                 LOG.warn("Failed to remove jar file: '{}'", e.getMessage());
-            };
+            }
         }
         reload();
     }
 
     public ArrayList<String> getLibraryClassNames() throws AtlasException {
         final String classSuffix = ".class";
-        ArrayList<String> classNames = new ArrayList<String>();
+        ArrayList<String> classNames = new ArrayList<>();
 
         if (this.urlClassLoader == null) {
             return classNames;
         }
-        URL candidateURLs[] = this.urlClassLoader.getURLs();
+        URL[] candidateURLs = this.urlClassLoader.getURLs();
 
-        for (int i=0; i < candidateURLs.length; i++) {
-            try (ZipInputStream zip = new ZipInputStream(new FileInputStream(candidateURLs[i].toURI().getPath()))) {
-                for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-                    if (!entry.isDirectory() && entry.getName().endsWith(classSuffix)) {
-                        String className = entry.getName().replace('/', '.');
-                        classNames.add(className.substring(0, className.length() - classSuffix.length()));
+        for (URL candidateURL : candidateURLs) {
+            try (ZipInputStream zip = new ZipInputStream(new FileInputStream(new File(candidateURL.toURI())))) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.isDirectory() || !entry.getName().endsWith(classSuffix)) {
+                        continue;
                     }
+                    String className = entry.getName().replace('/', '.');
+                    classNames.add(className.substring(0, className.length() - classSuffix.length()));
                 }
             } catch (IOException | URISyntaxException e) {
                 throw new AtlasException(String.format("URL library '%s' access error: %s",
-                    candidateURLs[i].getPath(), e.getMessage()));
+                    candidateURL.getPath(), e.getMessage()));
             }
         }
         return classNames;
@@ -146,19 +144,18 @@ public class AtlasLibraryLoader extends CompoundClassLoader {
         for (String className : getLibraryClassNames()) {
             try {
                 Class<?> c = loadClass(className);
-                if (clazz.isAssignableFrom(c)) {
-                    if (!allowAbstract
-                            && (c.isInterface() || Modifier.isAbstract(c.getModifiers()))) {
-                        continue;
-                    }
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Found {}", className);
-                    }
-                    answer.add(className);
+                if (!clazz.isAssignableFrom(c)) {
+                    continue;
                 }
+                if (!allowAbstract && (c.isInterface() || Modifier.isAbstract(c.getModifiers()))) {
+                    continue;
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Found {}", className);
+                }
+                answer.add(className);
             } catch (Exception e) {
-                LOG.debug("", e);
-                continue;
+                LOG.debug("Unable to inspect class {}", className, e);
             }
         }
         return answer;
@@ -187,8 +184,9 @@ public class AtlasLibraryLoader extends CompoundClassLoader {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Reloading library jars: {}", urls);
         }
-        this.urlClassLoader = urls.size() == 0 ? null
-         : new URLClassLoader(urls.toArray(new URL[0]), AtlasLibraryLoader.class.getClassLoader());
+        this.urlClassLoader = urls.isEmpty()
+            ? null
+            : new URLClassLoader(urls.toArray(new URL[0]), AtlasLibraryLoader.class.getClassLoader());
         listeners.forEach(l -> l.onUpdate(this));
     }
 
@@ -244,18 +242,7 @@ public class AtlasLibraryLoader extends CompoundClassLoader {
                 answer.add(e.nextElement());
             }
         }
-        return new Enumeration<URL>() {
-            Iterator<URL> iterator = answer.iterator();
-            @Override
-            public boolean hasMoreElements() {
-                return iterator.hasNext();
-            }
-
-            @Override
-            public URL nextElement() {
-                return iterator.next();
-            }
-        };
+        return java.util.Collections.enumeration(answer);
     }
 
     @Override
