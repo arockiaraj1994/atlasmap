@@ -28,6 +28,7 @@ ReactDOM.render(
     baseCSVInspectionServiceUrl={'/v2/atlas/csv/'}
     baseMappingServiceUrl={'/v2/atlas/'}
     logLevel={'info'}
+    workspaceId={'standalone'}
   >
     <App />
   </AtlasmapProvider>,

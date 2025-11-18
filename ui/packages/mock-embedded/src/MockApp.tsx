@@ -55,6 +55,7 @@ const MockApp: React.FC = () => {
           baseJSONInspectionServiceUrl={'/v2/atlas/json/'}
           baseCSVInspectionServiceUrl={'/v2/atlas/csv/'}
           baseMappingServiceUrl={'/v2/atlas/'}
+          workspaceId={'mock-embedded'}
           onMappings={function (mappings: string): void {
             receivedMappings = mappings;
           }}

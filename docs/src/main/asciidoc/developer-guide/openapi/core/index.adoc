@@ -230,6 +230,91 @@ ifdef::internal-generation[]
 endif::internal-generation[]
 
 
+[.createWorkspace]
+==== createWorkspace
+
+`POST /workspace/{workspaceId}`
+
+Create Workspace
+
+===== Description
+
+Create a dedicated workspace for a mappingDefinitionId
+
+
+// markup not found, no include::{specDir}workspace/\{workspaceId\}/POST/spec.adoc[opts=optional]
+
+
+
+===== Parameters
+
+====== Path Parameters
+
+[cols="2,3,1,1,1"]
+|===
+|Name| Description| Required| Default| Pattern
+
+| workspaceId
+| Workspace ID 
+| X
+| null
+| 
+
+|===
+
+
+
+
+
+
+===== Return Type
+
+
+
+-
+
+
+===== Responses
+
+.http response codes
+[cols="2,3,1"]
+|===
+| Code | Message | Datatype
+
+
+| 201
+| Workspace created successfully
+|  <<>>
+
+
+| 409
+| Workspace already exists
+|  <<>>
+
+|===
+
+===== Samples
+
+
+// markup not found, no include::{snippetDir}workspace/\{workspaceId\}/POST/http-request.adoc[opts=optional]
+
+
+// markup not found, no include::{snippetDir}workspace/\{workspaceId\}/POST/http-response.adoc[opts=optional]
+
+
+
+// file not found, no * wiremock data link :workspace/{workspaceId}/POST/POST.json[]
+
+
+ifdef::internal-generation[]
+===== Implementation
+
+// markup not found, no include::{specDir}workspace/\{workspaceId\}/POST/implementation.adoc[opts=optional]
+
+
+endif::internal-generation[]
+
+
 [.getMappingRequest]
 ==== getMappingRequest
 

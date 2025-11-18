@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -83,6 +84,8 @@ public class AtlasService {
     static final String ATLASMAP_ADM_PATH = "atlasmap.adm.path";
     static final String ATLASMAP_WORKSPACE = "atlasmap.workspace";
     private static final Logger LOG = LoggerFactory.getLogger(AtlasService.class);
+    private static final Pattern WORKSPACE_ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+    private static final String DEFAULT_WORKSPACE_ID = "0";
 
     private final DefaultAtlasContextFactory atlasContextFactory = DefaultAtlasContextFactory.getInstance();
     private final AtlasPreviewContext previewContext;
@@ -124,7 +127,7 @@ public class AtlasService {
             LOG.debug("Loading initial ADM file: {}", atlasmapAdmPath);
             this.libraryLoader.clearLibraries();
             ADMArchiveHandler admHandler = new ADMArchiveHandler(this.libraryLoader);
-            java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(0));
+            java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(DEFAULT_WORKSPACE_ID));
             admHandler.setPersistDirectory(mappingDirPath);
             admHandler.setIgnoreLibrary(false);
             admHandler.setLibraryDirectory(Paths.get(libFolder));
@@ -168,7 +171,7 @@ public class AtlasService {
     @ApiResponses(@ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = StringMap.class)) , description = "Return a list of a pair of mapping file name and content"))
     public Response listMappingsOld(@Context UriInfo uriInfo, @QueryParam("filter") final String filter)
     {
-        return listMappings(uriInfo, filter, 0);
+        return listMappings(uriInfo, filter, DEFAULT_WORKSPACE_ID);
     }
 
     @GET
@@ -177,11 +180,12 @@ public class AtlasService {
     @Operation(summary = "List Mappings", description = "Retrieves a list of mapping file name saved with specified mappingDefinitionId")
     @ApiResponses(@ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = StringMap.class)) , description = "Return a list of a pair of mapping file name and content"))
     public Response listMappings(@Context UriInfo uriInfo, @QueryParam("filter") final String filter,
-                                 @Parameter(description = "Mapping Definition ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId) {
+                                 @Parameter(description = "Mapping Definition ID") @PathParam("mappingDefinitionId") String mappingDefinitionId) {
         StringMap sMap = new StringMap();
         LOG.debug("listMappings with filter '{}'", filter);
 
-        ADMArchiveHandler handler = loadExplodedMappingDirectory(mappingDefinitionId);
+        String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+        ADMArchiveHandler handler = loadExplodedMappingDirectory(workspaceId);
         AtlasMapping map = handler.getMappingDefinition();
         if (map == null) {
             return Response.ok().entity(toJson(sMap)).build();
@@ -209,7 +213,7 @@ public class AtlasService {
         @ApiResponse(responseCode = "200", description = "Specified mapping file was removed successfully"),
         @ApiResponse(responseCode = "204", description = "Mapping file was not found")})
     public Response removeMappingRequestOld() {
-        return removeMappingRequest(0);
+        return removeMappingRequest(DEFAULT_WORKSPACE_ID);
     }
 
     @DELETE
@@ -219,9 +223,10 @@ public class AtlasService {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Specified mapping file was removed successfully"),
         @ApiResponse(responseCode = "204", description = "Mapping file was not found")})
-    public Response removeMappingRequest(@Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId) {
+    public Response removeMappingRequest(@Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") String mappingDefinitionId) {
 
-        java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(mappingDefinitionId));
+        String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+        java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(workspaceId));
         File mappingDirFile = mappingDirPath.toFile();
 
         if (mappingDirFile == null || !mappingDirFile.exists()) {
@@ -247,7 +252,7 @@ public class AtlasService {
         @ApiResponse(responseCode = "204", description = "Unable to remove mapping file and Catalogs for the specified ID")})
     public Response resetMappingByIdOld()
     {
-        return resetMappingById(0);
+        return resetMappingById(DEFAULT_WORKSPACE_ID);
     }
 
     @DELETE
@@ -257,10 +262,11 @@ public class AtlasService {
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Mapping file and Catalogs were removed successfully"),
         @ApiResponse(responseCode = "204", description = "Unable to remove mapping file and Catalogs for the specified ID")})
-    public Response resetMappingById(@Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId) {
-        LOG.debug("resetMappingById {} ", mappingDefinitionId);
+    public Response resetMappingById(@Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") String mappingDefinitionId) {
+        String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+        LOG.debug("resetMappingById {} ", workspaceId);
 
-        java.nio.file.Path mappingFolderPath = Paths.get(getMappingSubDirectory(mappingDefinitionId));
+        java.nio.file.Path mappingFolderPath = Paths.get(getMappingSubDirectory(workspaceId));
         File mappingFolderFile = mappingFolderPath.toFile();
 
         if (mappingFolderFile == null || !mappingFolderFile.exists()) {
@@ -308,6 +314,32 @@ public class AtlasService {
         return Response.ok().build();
     }
 
+    @POST
+    @Path("/workspace/{workspaceId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Create Workspace", description = "Create a dedicated workspace for a mappingDefinitionId")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Workspace created successfully"),
+        @ApiResponse(responseCode = "409", description = "Workspace already exists")
+    })
+    public Response createWorkspace(@Parameter(description = "Workspace ID") @PathParam("workspaceId") String workspaceId) {
+        String sanitizedId = sanitizeWorkspaceId(workspaceId);
+        java.nio.file.Path workspacePath = Paths.get(getMappingSubDirectory(sanitizedId));
+        File workspaceDir = workspacePath.toFile();
+        if (workspaceDir.exists()) {
+            if (!workspaceDir.isDirectory()) {
+                throw new WebApplicationException("Workspace path exists but is not a directory", Status.CONFLICT);
+            }
+            WorkspaceInfo info = new WorkspaceInfo(sanitizedId, "Workspace already exists");
+            return Response.status(Status.CONFLICT).entity(toJson(info)).build();
+        }
+        if (!workspaceDir.mkdirs()) {
+            throw new WebApplicationException("Unable to create workspace directory", Status.INTERNAL_SERVER_ERROR);
+        }
+        WorkspaceInfo info = new WorkspaceInfo(sanitizedId);
+        return Response.status(Status.CREATED).entity(toJson(info)).build();
+    }
+
     @Deprecated
     @GET
     @Path("/mapping/{mappingFormat}")
@@ -320,7 +352,7 @@ public class AtlasService {
     public Response getMappingRequestOld(
       @Parameter(description = "Mapping Format") @PathParam("mappingFormat") MappingFileType mappingFormat)
     {
-        return getMappingRequest(mappingFormat, 0);
+                return getMappingRequest(mappingFormat, DEFAULT_WORKSPACE_ID);
     }
 
     @GET
@@ -331,11 +363,12 @@ public class AtlasService {
         @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = AtlasMapping.class)), description = "Return a mapping file content"),
         @ApiResponse(responseCode = "204", description = "Mapping file was not found"),
         @ApiResponse(responseCode = "500", description = "Mapping file access error")})
-    public Response getMappingRequest(
-      @Parameter(description = "Mapping Format") @PathParam("mappingFormat") MappingFileType mappingFormat,
-      @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId) {
-        LOG.debug("getMappingRequest: {} '{}'", mappingFormat, mappingDefinitionId);
-        ADMArchiveHandler admHandler = loadExplodedMappingDirectory(mappingDefinitionId);
+        public Response getMappingRequest(
+            @Parameter(description = "Mapping Format") @PathParam("mappingFormat") MappingFileType mappingFormat,
+            @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") String mappingDefinitionId) {
+                String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+                LOG.debug("getMappingRequest: {} '{}'", mappingFormat, workspaceId);
+                ADMArchiveHandler admHandler = loadExplodedMappingDirectory(workspaceId);
 
         switch (mappingFormat) {
         case JSON:
@@ -343,21 +376,21 @@ public class AtlasService {
             try {
                 serialized = admHandler.getMappingDefinitionBytes();
             } catch (Exception e) {
-                LOG.error("Error retrieving mapping definition file for ID:" + mappingDefinitionId, e);
+                LOG.error("Error retrieving mapping definition file for ID:" + workspaceId, e);
                 throw new WebApplicationException(e.getMessage(), e, Status.INTERNAL_SERVER_ERROR);
             }
             if (LOG.isDebugEnabled() && serialized != null) {
                 LOG.debug(new String(serialized));
             }
             if (serialized == null) {
-                LOG.debug("Mapping definition not found for ID:{}", mappingDefinitionId);
+                LOG.debug("Mapping definition not found for ID:{}", workspaceId);
                 return Response.noContent().build();
             }
             return Response.ok().entity(serialized).build();
         case GZ:
             try {
                 if (admHandler.getGzippedADMDigestBytes() == null) {
-                    LOG.debug("ADM Digest file not found for ID:{}", mappingDefinitionId);
+                    LOG.debug("ADM Digest file not found for ID:{}", workspaceId);
                     return Response.noContent().build();
                 }
                 return Response.ok().entity(admHandler.getGzippedADMDigestBytes()).build();
@@ -393,7 +426,7 @@ public class AtlasService {
     public Response createMappingRequestOld(InputStream mapping,
     @Parameter(description = "Mapping Format") @PathParam("mappingFormat") MappingFileType mappingFormat,
     @Context UriInfo uriInfo) {
-        return createMappingRequest(mapping, mappingFormat, 0, uriInfo);
+        return createMappingRequest(mapping, mappingFormat, DEFAULT_WORKSPACE_ID, uriInfo);
     }
 
     @PUT
@@ -407,11 +440,12 @@ public class AtlasService {
         @ApiResponse(responseCode = "500", description = "Mapping file save error")})
     public Response createMappingRequest(InputStream mapping,
       @Parameter(description = "Mapping Format") @PathParam("mappingFormat") MappingFileType mappingFormat,
-      @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId,
+            @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") String mappingDefinitionId,
       @Context UriInfo uriInfo) {
         LOG.debug("createMappingRequest (save) with format '{}'", mappingFormat);
         UriBuilder builder = uriInfo.getAbsolutePathBuilder();
-        ADMArchiveHandler admHandler = loadExplodedMappingDirectory(mappingDefinitionId);
+                String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+                ADMArchiveHandler admHandler = loadExplodedMappingDirectory(workspaceId);
 
         switch (mappingFormat) {
         case JSON:
@@ -427,7 +461,7 @@ public class AtlasService {
             }
             return Response.ok().location(builder.build()).build();
         case GZ:
-            LOG.debug("  saveGzippedADMDigestRequest '{}' - ID: {}", admHandler.getGzippedADMDigestFileName(), mappingDefinitionId);
+            LOG.debug("  saveGzippedADMDigestRequest '{}' - ID: {}", admHandler.getGzippedADMDigestFileName(), workspaceId);
             try {
                 admHandler.setGzippedADMDigest(mapping);
                 admHandler.persist();
@@ -438,19 +472,19 @@ public class AtlasService {
             builder.path(admHandler.getGzippedADMDigestFileName());
             return Response.ok().location(builder.build()).build();
         case ZIP:
-            LOG.debug("  importADMArchiveRequest - ID:'{}'", mappingDefinitionId);
+            LOG.debug("  importADMArchiveRequest - ID:'{}'", workspaceId);
             try {
                 admHandler.setIgnoreLibrary(false);
                 admHandler.setLibraryDirectory(Paths.get(libFolder));
                 admHandler.load(mapping);
                 this.libraryLoader.reload();
                 admHandler.persist();
-                LOG.debug("  importADMArchiveRequest complete - ID:'{}'", mappingDefinitionId);
+                LOG.debug("  importADMArchiveRequest complete - ID:'{}'", workspaceId);
             } catch (Exception e) {
                 LOG.error("Error importing ADM archive.\n" + e.getMessage(), e);
                 throw new WebApplicationException(e.getMessage(), e, Status.INTERNAL_SERVER_ERROR);
             }
-            builder.path("atlasmap-" + mappingDefinitionId + ".adm");
+            builder.path("atlasmap-" + workspaceId + ".adm");
             return Response.ok().location(builder.build()).build();
         case XML:
             throw new WebApplicationException("XML mapping format is no longer supported. Please use JSON format instead.");
@@ -471,7 +505,7 @@ public class AtlasService {
             InputStream mapping,
             @Context UriInfo uriInfo)
     {
-        return updateMappingRequest(mapping, 0, uriInfo);
+        return updateMappingRequest(mapping, DEFAULT_WORKSPACE_ID, uriInfo);
     }
 
     @POST
@@ -483,9 +517,10 @@ public class AtlasService {
     @ApiResponses(@ApiResponse(responseCode = "200", description = "Succeeded"))
     public Response updateMappingRequest(
             InputStream mapping,
-            @Parameter(description = "Mapping Definition ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId,
+            @Parameter(description = "Mapping Definition ID") @PathParam("mappingDefinitionId") String mappingDefinitionId,
             @Context UriInfo uriInfo) {
-        ADMArchiveHandler handler = loadExplodedMappingDirectory(mappingDefinitionId);
+        String workspaceId = sanitizeWorkspaceId(mappingDefinitionId);
+        ADMArchiveHandler handler = loadExplodedMappingDirectory(workspaceId);
         UriBuilder builder = uriInfo.getAbsolutePathBuilder();
         try {
             handler.setMappingDefinitionBytes(mapping);
@@ -510,7 +545,7 @@ public class AtlasService {
     public Response validateMappingRequestOld(InputStream mapping,
                                            @Context UriInfo uriInfo)
     {
-        return validateMappingRequest(mapping, 0, uriInfo);
+        return validateMappingRequest(mapping, DEFAULT_WORKSPACE_ID, uriInfo);
     }
 
     @PUT
@@ -521,12 +556,12 @@ public class AtlasService {
     @RequestBody(description = "Mapping file content", content = @Content(schema = @Schema(implementation = AtlasMapping.class)))
     @ApiResponses(@ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation =  Validations.class)), description = "Return a validation result"))
     public Response validateMappingRequest(InputStream mapping,
-                                           @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") Integer mappingDefinitionId,
+                                           @Parameter(description = "Mapping ID") @PathParam("mappingDefinitionId") String mappingDefinitionId,
                                            @Context UriInfo uriInfo) {
         try {
             AtlasMapping atlasMapping = fromJson(mapping, AtlasMapping.class);
             LOG.debug("Validate mappings: {}", atlasMapping.getName());
-            return validateMapping(mappingDefinitionId, atlasMapping, uriInfo);
+            return validateMapping(sanitizeWorkspaceId(mappingDefinitionId), atlasMapping, uriInfo);
         } catch (AtlasException | IOException e) {
             throw new WebApplicationException(e.getMessage(), e, Status.INTERNAL_SERVER_ERROR);
         }
@@ -672,7 +707,7 @@ public class AtlasService {
         return this.libraryLoader;
     }
 
-    protected Response validateMapping(Integer mappingDefinitionId, AtlasMapping mapping, UriInfo uriInfo) throws IOException, AtlasException {
+    protected Response validateMapping(String workspaceId, AtlasMapping mapping, UriInfo uriInfo) throws IOException, AtlasException {
         AtlasSession session;
         synchronized (atlasContextFactory) {
             AtlasContext context = atlasContextFactory.createContext(mapping);
@@ -714,12 +749,44 @@ public class AtlasService {
         }
     }
 
-    private String getMappingSubDirectory(Integer mappingDefinitionId) {
-        return this.mappingFolder + File.separator + mappingDefinitionId;
+    private String sanitizeWorkspaceId(String workspaceId) {
+        if (workspaceId == null) {
+            throw new WebApplicationException("Mapping definition ID must be specified", Status.BAD_REQUEST);
+        }
+        String trimmed = workspaceId.trim();
+        if (trimmed.isEmpty()) {
+            throw new WebApplicationException("Mapping definition ID must not be empty", Status.BAD_REQUEST);
+        }
+        if (!WORKSPACE_ID_PATTERN.matcher(trimmed).matches()) {
+            throw new WebApplicationException(
+                    "Mapping definition ID contains invalid characters. Only alphanumerics, '-' and '_' are allowed.",
+                    Status.BAD_REQUEST);
+        }
+        return trimmed;
     }
 
-    private ADMArchiveHandler loadExplodedMappingDirectory(Integer mappingDefinitionId) {
-        java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(mappingDefinitionId));
+    @SuppressWarnings("unused")
+    private static final class WorkspaceInfo {
+        public final String workspaceId;
+        public final String message;
+
+        WorkspaceInfo(String workspaceId) {
+            this(workspaceId, null);
+        }
+
+        WorkspaceInfo(String workspaceId, String message) {
+            this.workspaceId = workspaceId;
+            this.message = message;
+        }
+    }
+
+    private String getMappingSubDirectory(String workspaceId) {
+        String sanitizedId = sanitizeWorkspaceId(workspaceId);
+        return this.mappingFolder + File.separator + sanitizedId;
+    }
+
+    private ADMArchiveHandler loadExplodedMappingDirectory(String workspaceId) {
+        java.nio.file.Path mappingDirPath = Paths.get(getMappingSubDirectory(workspaceId));
         File mappingDirFile = mappingDirPath.toFile();
         if (!mappingDirFile.exists()) {
             mappingDirFile.mkdirs();

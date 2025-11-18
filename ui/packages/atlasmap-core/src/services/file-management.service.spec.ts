@@ -199,6 +199,27 @@ describe('FileManagementService', () => {
     });
   });
 
+  test('ensureWorkspace() creates workspace when missing', async () => {
+    const postMock = jest.fn().mockReturnValue(Promise.resolve(undefined));
+    mockedKy.post = postMock as any;
+    await expect(service.ensureWorkspace('tenant-A')).resolves.toBeUndefined();
+    expect(postMock).toHaveBeenCalledWith(
+      expect.stringContaining('workspace/tenant-A')
+    );
+  });
+
+  test('ensureWorkspace() ignores existing workspace', async () => {
+    const conflictError = { status: 409 };
+    mockedKy.post = jest.fn().mockReturnValue(Promise.reject(conflictError));
+    await expect(service.ensureWorkspace('tenant-B')).resolves.toBeUndefined();
+  });
+
+  test('ensureWorkspace() propagates unexpected errors', async () => {
+    const failure = { status: 500 };
+    mockedKy.post = jest.fn().mockReturnValue(Promise.reject(failure));
+    await expect(service.ensureWorkspace('tenant-C')).rejects.toBe(failure);
+  });
+
   test('resetMappings() server error', (done) => {
     mockedKy.delete = jest.fn().mockReturnValue(
       new (class {

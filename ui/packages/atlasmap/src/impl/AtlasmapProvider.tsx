@@ -108,6 +108,28 @@ import {
 import { LogLevelDesc } from 'loglevel';
 import { debounceTime } from 'rxjs/operators';
 
+const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const DEFAULT_WORKSPACE_ID = '0';
+
+const resolveWorkspaceId = (
+  workspaceId: string | undefined,
+  warn: (message: string) => void,
+): string => {
+  if (!workspaceId) {
+    return DEFAULT_WORKSPACE_ID;
+  }
+
+  const trimmed = workspaceId.trim();
+  if (!trimmed || !WORKSPACE_ID_PATTERN.test(trimmed)) {
+    warn(
+      `Invalid workspaceId "${workspaceId}" provided. Falling back to "${DEFAULT_WORKSPACE_ID}". Workspace IDs must match ${WORKSPACE_ID_PATTERN}.`,
+    );
+    return DEFAULT_WORKSPACE_ID;
+  }
+
+  return trimmed;
+};
+
 // the document payload with get from Syndesis
 export interface IExternalDocumentProps {
   id: string;
@@ -134,6 +156,7 @@ export interface IAtlasmapProviderProps {
   baseCSVInspectionServiceUrl: string;
   baseMappingServiceUrl: string;
   logLevel: string;
+  workspaceId?: string;
 
   externalDocument?: {
     documentId: string;
@@ -149,6 +172,7 @@ export const AtlasmapProvider: FunctionComponent<IAtlasmapProviderProps> = ({
   baseJSONInspectionServiceUrl,
   baseCSVInspectionServiceUrl,
   baseMappingServiceUrl,
+  workspaceId,
   externalDocument,
   onMappingChange,
   logLevel,
@@ -182,8 +206,10 @@ export const AtlasmapProvider: FunctionComponent<IAtlasmapProviderProps> = ({
   const markNotificationRead = (id: string) =>
     dispatchNotifications({ type: 'dismiss', payload: { id } });
 
-  useEffect(
-    function onInitializationCb() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const initializeAsync = async () => {
       onReset();
       initializationService.resetConfig();
       const cfg = initializationService.cfg;
@@ -195,6 +221,30 @@ export const AtlasmapProvider: FunctionComponent<IAtlasmapProviderProps> = ({
       cfg.initCfg.baseXMLInspectionServiceUrl = baseXMLInspectionServiceUrl;
       cfg.initCfg.baseJSONInspectionServiceUrl = baseJSONInspectionServiceUrl;
       cfg.initCfg.baseCSVInspectionServiceUrl = baseCSVInspectionServiceUrl;
+      const warn = (message: string) => {
+        if (cfg.logger) {
+          cfg.logger.warn(message);
+        } else {
+          console.warn(message);
+        }
+      };
+      const resolvedWorkspaceId = resolveWorkspaceId(workspaceId, warn);
+      cfg.mappingDefinitionId = resolvedWorkspaceId;
+
+      try {
+        await (cfg.fileService as any).ensureWorkspace?.(
+          resolvedWorkspaceId,
+        );
+      } catch (error) {
+        const message = `Unable to initialize workspace "${resolvedWorkspaceId}".`;
+        warn(message);
+        cfg.errorService.addBackendError(message, error);
+        return;
+      }
+
+      if (cancelled) {
+        return;
+      }
 
       if (externalDocument) {
         externalDocument.inputDocuments.forEach((d) => {
@@ -238,18 +288,26 @@ export const AtlasmapProvider: FunctionComponent<IAtlasmapProviderProps> = ({
 
       initializationService.initialize();
 
-      onLoading();
-    },
-    [
-      baseCSVInspectionServiceUrl,
-      baseJSONInspectionServiceUrl,
-      baseJavaInspectionServiceUrl,
-      baseMappingServiceUrl,
-      baseXMLInspectionServiceUrl,
-      externalDocument,
-      logLevel,
-    ],
-  );
+      if (!cancelled) {
+        onLoading();
+      }
+    };
+
+    void initializeAsync();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    baseCSVInspectionServiceUrl,
+    baseJSONInspectionServiceUrl,
+    baseJavaInspectionServiceUrl,
+    baseMappingServiceUrl,
+    baseXMLInspectionServiceUrl,
+    externalDocument,
+    workspaceId,
+    logLevel,
+  ]);
 
   const configModel = initializationService.cfg;
 

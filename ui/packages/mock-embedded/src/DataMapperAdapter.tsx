@@ -35,6 +35,7 @@ export interface IDataMapperAdapterProps {
   baseJSONInspectionServiceUrl: string;
   baseCSVInspectionServiceUrl: string;
   onMappings(mappings: string): void;
+  workspaceId?: string;
 }
 
 export interface IParameter {
@@ -60,6 +61,7 @@ export const DataMapperAdapter: React.FunctionComponent<
   baseJSONInspectionServiceUrl,
   baseCSVInspectionServiceUrl,
   onMappings,
+  workspaceId,
 }) => {
   const externalDocument = React.useMemo(
     () =>
@@ -79,6 +81,7 @@ export const DataMapperAdapter: React.FunctionComponent<
       baseJavaInspectionServiceUrl={baseJavaInspectionServiceUrl}
       baseXMLInspectionServiceUrl={baseXMLInspectionServiceUrl}
       baseCSVInspectionServiceUrl={baseCSVInspectionServiceUrl}
+      workspaceId={workspaceId}
       externalDocument={externalDocument}
       onMappingChange={onMappings}
     >

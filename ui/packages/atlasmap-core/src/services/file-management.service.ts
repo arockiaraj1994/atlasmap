@@ -28,7 +28,10 @@ import { gzip, inflate } from 'pako';
 import { ADMDigest } from '../contracts/adm-digest';
 import { CommonUtil } from '../utils/common-util';
 import { ConfigModel } from '../models/config.model';
-import { HTTP_STATUS_NO_CONTENT } from '../common/config.types';
+import {
+  HTTP_STATUS_CONFLICT,
+  HTTP_STATUS_NO_CONTENT,
+} from '../common/config.types';
 import { MappingDigestUtil } from '../utils/mapping-digest-util';
 import ky from 'ky';
 import log from 'loglevel';
@@ -66,10 +69,13 @@ export class FileManagementService {
 
   findMappingFiles(filter: string): Promise<string[]> {
     return new Promise<string[]>((resolve, reject) => {
+      const filterSuffix =
+        filter == null ? '' : '?filter=' + encodeURIComponent(filter);
       const url =
         this.cfg.initCfg.baseMappingServiceUrl +
-        'mappings' +
-        (filter == null ? '' : '?filter=' + filter);
+        'mappings/' +
+        this.workspaceSegment() +
+        filterSuffix;
       this.cfg.logger!.debug('Mapping List Request');
       this.api
         .get(url)
@@ -127,7 +133,9 @@ export class FileManagementService {
     fileType: string
   ): Promise<Uint8Array | null> {
     return new Promise<Uint8Array | null>((resolve, reject) => {
-      const url = `${this.cfg.initCfg.baseMappingServiceUrl}mapping/${fileType}/`;
+      const url =
+        `${this.cfg.initCfg.baseMappingServiceUrl}mapping/${fileType}/` +
+        this.workspaceSegment();
       this.cfg.logger!.debug(`Get Current ${fileName} Request: ${url}`);
       const headers = {
         'Content-Type': 'application/octet-stream',
@@ -164,7 +172,10 @@ export class FileManagementService {
    */
   resetMappings(): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/RESET';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/RESET/' +
+        this.workspaceSegment();
       this.cfg.logger!.debug('Reset Mappings Request');
       this.api
         .delete(url)
@@ -245,6 +256,29 @@ export class FileManagementService {
     });
   }
 
+  async ensureWorkspace(workspaceId: string): Promise<void> {
+    const id = workspaceId ?? '0';
+    const url =
+      this.cfg.initCfg.baseMappingServiceUrl +
+      'workspace/' +
+      encodeURIComponent(id);
+    this.cfg.logger?.debug(`Ensure Workspace Request: ${url}`);
+    try {
+      await this.api.post(url);
+      this.cfg.logger?.debug(`Workspace '${id}' ensured.`);
+    } catch (error: any) {
+      if (error && error.status === HTTP_STATUS_CONFLICT) {
+        this.cfg.logger?.debug(`Workspace '${id}' already exists.`);
+        return;
+      }
+      this.cfg.errorService.addBackendError(
+        `Error occurred while ensuring workspace '${id}' exists.`,
+        error
+      );
+      throw error;
+    }
+  }
+
   /**
    * Commit the specified AtlasMapping object to the runtime service.  The mappings
    * are kept separate so they can be updated with minimal overhead.
@@ -266,7 +300,10 @@ export class FileManagementService {
    */
   setMappingStringToService(jsonBuffer: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/JSON';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/JSON/' +
+        this.workspaceSegment();
       const headers = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -316,7 +353,10 @@ export class FileManagementService {
         return;
       }
       // Update .../target/mappings/adm-catalog-files.gz
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/GZ/0';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/GZ/' +
+        this.workspaceSegment();
       const fileContent: Blob = new Blob([compressedBuffer], {
         type: 'application/octet-stream',
       });
@@ -331,7 +371,10 @@ export class FileManagementService {
   private setADMArchiveFileToService(
     compressedBuffer: BlobPart
   ): Promise<boolean> {
-    const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/ZIP/';
+    const url =
+      this.cfg.initCfg.baseMappingServiceUrl +
+      'mapping/ZIP/' +
+      this.workspaceSegment();
     const fileContent: Blob = new Blob([compressedBuffer], {
       type: 'application/octet-stream',
     });
@@ -533,7 +576,9 @@ export class FileManagementService {
       }
       this.cfg.mappingFiles[0] = this.cfg.mappings.name!;
       const baseURL: string =
-        this.cfg.initCfg.baseMappingServiceUrl + 'mapping/JSON/';
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/JSON/' +
+        this.workspaceSegment();
       this.cfg.logger!.debug('Get Current Mapping Request');
       this.api
         .get(baseURL)
@@ -556,5 +601,10 @@ export class FileManagementService {
           }
         });
     });
+  }
+
+  private workspaceSegment(): string {
+    const workspaceId = this.cfg.mappingDefinitionId ?? '0';
+    return encodeURIComponent(workspaceId);
   }
 }

@@ -18,6 +18,7 @@ package io.atlasmap.service;
 import static io.atlasmap.v2.MappingFileType.JSON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -108,7 +109,8 @@ public class AtlasServiceTest {
     @Test
     public void testListMappings() throws Exception {
         Response resp = service.listMappings(
-                generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mappings"), null, null);
+            generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mappings"), null,
+            "0");
         StringMap sMap = Json.mapper().readValue((byte[])resp.getEntity(), StringMap.class);
         LOG.info("Found " + sMap.getStringMapEntry().size() + " objects");
         for (StringMapEntry s : sMap.getStringMapEntry()) {
@@ -118,7 +120,7 @@ public class AtlasServiceTest {
 
     @Test
     public void testGetMapping() {
-        Response resp = service.getMappingRequest(JSON, 3);
+        Response resp = service.getMappingRequest(JSON, "3");
         assertEquals(204, resp.getStatus());
         assertNull(resp.getEntity());
     }
@@ -159,7 +161,7 @@ public class AtlasServiceTest {
         assertEquals("io.atlasmap.service.my.MyCustomMappingBuilder", builders.get(0).asText());
 
         BufferedInputStream in = new BufferedInputStream(new FileInputStream("src/test/resources/mappings/atlasmapping-custom-action.json"));
-        Response resVD = service.validateMappingRequest(in, 0, null);
+        Response resVD = service.validateMappingRequest(in, "0", null);
         assertEquals(200, resVD.getStatus());
     }
 
@@ -294,10 +296,10 @@ public class AtlasServiceTest {
     @Test
     public void testADMUpload() throws Exception {
         InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("json-schema-source-to-xml-schema-target.adm");
-        Response res = service.createMappingRequest(in, MappingFileType.ZIP, 0,
+        Response res = service.createMappingRequest(in, MappingFileType.ZIP, "0",
             generateTestUriInfo("http://localhost:8686/v2/atlas", "http://localhost:8686/v2/atlas/mapping/ZIP/0"));
         assertEquals(200, res.getStatus());
-        res = service.getMappingRequest(MappingFileType.JSON, 0);
+        res = service.getMappingRequest(MappingFileType.JSON, "0");
         assertEquals(200, res.getStatus());
         AtlasMapping mappings = mapper.readValue((byte[])res.getEntity(), AtlasMapping.class);
         assertEquals(4, mappings.getMappings().getMapping().size());
@@ -360,6 +362,47 @@ public class AtlasServiceTest {
         ProcessMappingResponse pmr = Json.mapper().readValue((byte[])resMR.getEntity(), ProcessMappingResponse.class);
         assertEquals(0, pmr.getAudits().getAudit().size(), printAudit(pmr.getAudits()));
         assertEquals("param foo", pmr.getMapping().getOutputField().get(0).getValue());
+    }
+
+    @Test
+    public void testWorkspaceIsolationForMappings() throws Exception {
+        final String workspaceAlpha = "clientAlpha";
+        final String workspaceBeta = "clientBeta";
+
+        try (InputStream mappingAlpha = new FileInputStream("src/test/resources/mappings/atlasmapping.json")) {
+            service.createMappingRequest(
+                mappingAlpha,
+                MappingFileType.JSON,
+                workspaceAlpha,
+                generateTestUriInfo(
+                    "http://localhost:8686/v2/atlas",
+                    "http://localhost:8686/v2/atlas/mapping/JSON/" + workspaceAlpha));
+        }
+
+        try (InputStream mappingBeta = new FileInputStream("src/test/resources/mappings/atlasmapping-junit4.json")) {
+            service.createMappingRequest(
+                mappingBeta,
+                MappingFileType.JSON,
+                workspaceBeta,
+                generateTestUriInfo(
+                    "http://localhost:8686/v2/atlas",
+                    "http://localhost:8686/v2/atlas/mapping/JSON/" + workspaceBeta));
+        }
+
+        Response respAlpha = service.getMappingRequest(MappingFileType.JSON, workspaceAlpha);
+        assertEquals(200, respAlpha.getStatus());
+        AtlasMapping atlasAlpha = mapper.readValue((byte[]) respAlpha.getEntity(), AtlasMapping.class);
+        assertEquals("junit", atlasAlpha.getName());
+
+        Response respBeta = service.getMappingRequest(MappingFileType.JSON, workspaceBeta);
+        assertEquals(200, respBeta.getStatus());
+        AtlasMapping atlasBeta = mapper.readValue((byte[]) respBeta.getEntity(), AtlasMapping.class);
+        assertEquals("junit4", atlasBeta.getName());
+
+        assertNotEquals(
+            atlasAlpha.getName(),
+            atlasBeta.getName(),
+            "Distinct workspaces must not share the same mapping content");
     }
 
     protected UriInfo generateTestUriInfo(String baseUri, String absoluteUri) throws Exception {
