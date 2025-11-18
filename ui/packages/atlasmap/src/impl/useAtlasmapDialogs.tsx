@@ -33,9 +33,9 @@ import {
   useDeleteMappingDialog,
   useDeletePropertyDialog,
   useEditMappingEnumerationDialog,
-  useExportMappingDialog,
+  useExportADMArchiveDialog,
+  useImportADMArchiveDialog,
   useImportDocumentDialog,
-  useImportMappingDialog,
   useNamespaceDialog,
   useParametersDialog,
   usePropertyDialog,
@@ -149,8 +149,10 @@ export function useAtlasmapDialogs({
   //#endregion
 
   //#region atlasmap catalog
-  const [importMappingsDialog, onImportMappings] = useImportMappingDialog();
-  const [exportMappingsDialog, onExportMappings] = useExportMappingDialog();
+  const [importADMArchiveDialog, onImportADMArchive] =
+    useImportADMArchiveDialog();
+  const [exportADMArchiveDialog, onExportADMArchive] =
+    useExportADMArchiveDialog();
   const [resetDialog, onResetAtlasmap] = useResetAtlasmapDialog();
   const [aboutDialog, onAbout] = useAboutDialog();
   const [toggleExpressionModeDialog, onToggleExpressionMode] =
@@ -300,8 +302,8 @@ export function useAtlasmapDialogs({
     () =>
       createPortal(
         <>
-          {importMappingsDialog}
-          {exportMappingsDialog}
+          {importADMArchiveDialog}
+          {exportADMArchiveDialog}
           {importDocumentDialog}
           {deleteDocumentDialog}
           {specifyInstanceSchemaDialog}
@@ -340,8 +342,8 @@ export function useAtlasmapDialogs({
       editConstantDialog,
       editNamespaceDialog,
       editPropertyDialog,
-      exportMappingsDialog,
-      importMappingsDialog,
+      exportADMArchiveDialog,
+      importADMArchiveDialog,
       importDocumentDialog,
       specifyInstanceSchemaDialog,
       modalContainer,
@@ -356,8 +358,8 @@ export function useAtlasmapDialogs({
 
   return {
     handlers: {
-      onImportMappings: onImportMappings,
-      onExportMappings: onExportMappings,
+      onImportADMArchive: onImportADMArchive,
+      onExportADMArchive: onExportADMArchive,
       onCreateConstant,
       onDeleteConstant,
       onEditConstant,

@@ -57,7 +57,7 @@ import {
   enableCustomClass,
   errorInfoToNotification,
   executeFieldSearch,
-  exportMappingFile,
+  exportADMArchiveFile,
   fromDocumentDefinitionToFieldGroup,
   fromFieldToIFieldsNode,
   fromMappedFieldToIMappingField,
@@ -79,9 +79,9 @@ import {
   handleRemoveTransformation,
   handleTransformationArgumentChange,
   handleTransformationChange,
+  importADMArchiveFile,
   importInstanceSchema,
   importJarFile,
-  importMappingFile,
   initializationService,
   isEnumerationMapping,
   mappingExpressionAddField,
@@ -478,9 +478,9 @@ export function useAtlasmap() {
     [configModel],
   );
 
-  const handleImportMappingFile = useCallback(
+  const handleImportADMArchiveFile = useCallback(
     (file: File) => {
-      importMappingFile(file, configModel);
+      importADMArchiveFile(file, configModel);
     },
     [configModel],
   );
@@ -575,8 +575,8 @@ export function useAtlasmap() {
     selectMapping,
     deselectMapping,
     deleteAtlasFile,
-    exportMappingFile: exportMappingFile,
-    importMappingFile: handleImportMappingFile,
+    exportADMArchiveFile: exportADMArchiveFile,
+    importADMArchiveFile: handleImportADMArchiveFile,
     importJarFile: handleImportJarFile,
     resetAtlasmap: handleResetAtlasmap,
     getUIVersion: getUIVersion,

@@ -197,20 +197,20 @@ describe('InitializationService', () => {
     });
   });
 
-  test('initializeWithMappingFile()', (done) => {
-    const spyImportMapping = spyOn(
+  test('initializeWithADMArchiveFile()', (done) => {
+    const spyImportAdm = spyOn(
       service.cfg.fileService,
-      'importMappings'
+      'importADMArchive'
     ).and.returnValue(Promise.resolve(true));
     const spyInitialize = spyOn(service, 'initialize').and.returnValue(
       Promise.resolve(true)
     );
     const binary = new TextEncoder().encode('dummy binary');
     service
-      .initializeWithMappingFile(new File([new Blob([binary])], 'dummy.json'))
+      .initializeWithADMArchiveFile(new File([new Blob([binary])], 'dummy.adm'))
       .then((value) => {
         expect(value).toBeTruthy();
-        expect(spyImportMapping.calls.count()).toBe(1);
+        expect(spyImportAdm.calls.count()).toBe(1);
         expect(spyInitialize.calls.count()).toBe(1);
         done();
       });
