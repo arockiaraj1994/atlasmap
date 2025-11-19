@@ -266,16 +266,18 @@ export class FileManagementService {
     try {
       await this.api.post(url);
       this.cfg.logger?.debug(`Workspace '${id}' ensured.`);
-    } catch (error: any) {
-      if (error && error.status === HTTP_STATUS_CONFLICT) {
+    } catch (error) {
+      const err = error as any;
+      const status = err?.status ?? err?.response?.status;
+      if (status === HTTP_STATUS_CONFLICT) {
         this.cfg.logger?.debug(`Workspace '${id}' already exists.`);
         return;
       }
       this.cfg.errorService.addBackendError(
         `Error occurred while ensuring workspace '${id}' exists.`,
-        error
+        err
       );
-      throw error;
+      throw err;
     }
   }
 
