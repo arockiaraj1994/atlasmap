@@ -24,6 +24,7 @@
     "baseUrl": "./",
     "jsx": "react",
     "esModuleInterop": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "skipLibCheck": true
   }
 }

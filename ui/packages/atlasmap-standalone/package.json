@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "craco start",
-    "build:module": "craco build",
+    "build:module": "cross-env NODE_OPTIONS=--openssl-legacy-provider craco build",
     "build": "npm-run-all build:module lint test",
     "test": "craco test --watchAll=false --runInBand",
     "test:coverage": "craco test --watchAll=false --coverage --runInBand",
@@ -49,6 +49,7 @@
   "devDependencies": {
     "@craco/craco": "5.8.0",
     "@types/jest": "24.9.1",
+    "cross-env": "^7.0.3",
     "typescript": "~3.9.9"
   },
   "resolutions": {

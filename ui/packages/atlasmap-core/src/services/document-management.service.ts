@@ -485,10 +485,12 @@ export class DocumentManagementService {
             // All fields below the matching field are also visible.
             try {
               this.markChildrenVisible(field);
-            } catch (error) {
+            } catch (error: unknown) {
+              const message =
+                error instanceof Error ? error.message : String(error);
               cfg.errorService.addError(
                 new ErrorInfo({
-                  message: error.message,
+                  message,
                   level: ErrorLevel.INFO,
                   scope: ErrorScope.APPLICATION,
                   type: ErrorType.USER,

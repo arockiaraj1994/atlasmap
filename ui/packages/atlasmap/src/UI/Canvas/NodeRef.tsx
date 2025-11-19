@@ -16,6 +16,7 @@
 import {
   Children,
   PropsWithChildren,
+  ReactElement,
   cloneElement,
   forwardRef,
   isValidElement,
@@ -42,8 +43,8 @@ export const NodeRef = forwardRef<
   };
 
   return isValidElement(node)
-    ? cloneElement(node, {
-        ref: handleRef,
+    ? cloneElement(node as ReactElement, {
+        ref: handleRef as any,
       })
     : null;
 });

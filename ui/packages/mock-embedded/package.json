@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "craco --max_old_space_size=4096 start",
-    "build:module": "craco --max_old_space_size=4096 build",
+    "build:module": "cross-env NODE_OPTIONS=--openssl-legacy-provider craco --max_old_space_size=4096 build",
     "build": "npm-run-all build:module lint test",
     "test": "craco test --watchAll=false --runInBand",
     "test:coverage": "craco test --watchAll=false --coverage --runInBand",
@@ -51,6 +51,7 @@
   "devDependencies": {
     "@craco/craco": "5.8.0",
     "@types/jest": "24.9.1",
+    "cross-env": "^7.0.3",
     "prettier": "^2.5.0",
     "typescript": "~3.9.9"
   },

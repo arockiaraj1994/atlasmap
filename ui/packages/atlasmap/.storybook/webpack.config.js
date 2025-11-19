@@ -1,6 +1,11 @@
 const path = require('path')
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin')
 const excludePaths = [/node_modules/, /dist/]
+const transpiledNodeModules = [
+  path.resolve(__dirname, '../../../node_modules/ky'),
+  path.resolve(__dirname, '../../../node_modules/@react-spring'),
+  path.resolve(__dirname, '../../../node_modules/react-spring')
+]
 
 module.exports = ({ config }) => {
   // HACK: ensure typescript paths are resolved by webpack too
@@ -36,6 +41,31 @@ module.exports = ({ config }) => {
     ]
   })
 
+  config.resolve.extensions = config.resolve.extensions || ['.js', '.jsx']
+  if (!config.resolve.extensions.includes('.ts')) {
+    config.resolve.extensions.push('.ts', '.tsx')
+  }
+
+  config.module.rules.push({
+    test: /\.(ts|tsx)$/,
+    use: [
+      {
+        loader: "babel-loader",
+        options: {
+          presets: [
+            "@babel/preset-env",
+            "@babel/preset-react",
+            "@babel/preset-typescript"
+          ]
+        }
+      }
+    ],
+    include: [
+      path.resolve(__dirname, '../src'),
+      path.resolve(__dirname, '../doc')
+    ]
+  })
+
   config.module.rules.push({
     test: /\.js$/,
     use: [
@@ -48,7 +78,7 @@ module.exports = ({ config }) => {
         },
       }
     ],
-    include: [ path.resolve(__dirname, '../../../node_modules/ky') ]
+    include: transpiledNodeModules
   })
 
   const cssModuleRegex = /\.module\.css$/;

@@ -40,8 +40,12 @@
     "@testing-library/jest-dom": "^5.7.0",
     "@testing-library/react": "^12.1.5",
     "@testing-library/user-event": "^14.4.3",
+    "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "@types/he": "^1.2.2",
     "@types/hoist-non-react-statics": "^3.3.1",
     "@types/jest": "24.9.1",
+    "@types/minimatch": "^3.0.5",
     "@typescript-eslint/eslint-plugin": "^4.23.0",
     "@typescript-eslint/parser": "^4.26.0",
     "autoprefixer": "^10.2.5",
@@ -66,7 +70,7 @@
     "tsconfig-paths-webpack-plugin": "^4.0.0",
     "tsdx": "^0.13.1",
     "typed-css-modules": "^0.7.0",
-    "typescript": "~3.9.9",
+    "typescript": "~4.9.5",
     "typescript-plugin-css-modules": "^4.1.0"
   },
   "peerDependencies": {

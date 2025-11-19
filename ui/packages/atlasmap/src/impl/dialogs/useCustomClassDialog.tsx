@@ -48,11 +48,21 @@ export function useCustomClassDialog(
     setCustomClassNames(await getCustomClassNameOptions());
   };
 
+  const initialValues: ICustomClass =
+    initialCustomClass || { customClassName: '', collectionType: 'NONE' };
+  const { customClassName: initialCustomClassName, ...restInitialValues } =
+    initialValues;
+  const resolvedCustomClassName =
+    initialCustomClassName ||
+    (customClassNames && customClassNames.length > 0
+      ? customClassNames[0]
+      : '');
+
   const dialog = (
     <CustomClassDialog
       title={title}
       isOpen={state}
-      customClassName={customClassNames ? customClassNames[0] : ''}
+      customClassName={resolvedCustomClassName}
       customClassNames={customClassNames}
       collectionTypeOptions={collectionTypes.map(([value, label]) => ({
         value,
@@ -60,7 +70,7 @@ export function useCustomClassDialog(
       }))}
       onCancel={toggleOff}
       onConfirm={onConfirm}
-      {...(initialCustomClass || { collectionType: 'NONE' })}
+      {...restInitialValues}
     />
   );
   const onOpenCustomClassDialog = useCallback(

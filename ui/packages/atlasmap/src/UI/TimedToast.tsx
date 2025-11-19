@@ -49,7 +49,7 @@ export const TimedToast: FunctionComponent<ITimedToastProps> = ({
     const tick = () => {
       setElapsed((elapsed) => elapsed - intervalTime);
     };
-    let timer: NodeJS.Timer | undefined = undefined;
+    let timer: ReturnType<typeof setInterval> | undefined = undefined;
     if (elapsed <= 0) {
       onTimeout();
     } else if (!hovering && !timer) {
@@ -57,7 +57,7 @@ export const TimedToast: FunctionComponent<ITimedToastProps> = ({
     } else {
       setElapsed(showTime);
     }
-    return () => timer && clearTimeout(timer);
+    return () => timer && clearInterval(timer);
   }, [elapsed, hovering, onTimeout]);
   return (
     <Alert
