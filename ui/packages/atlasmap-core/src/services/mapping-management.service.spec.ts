@@ -18,6 +18,7 @@ import ky, { Options } from 'ky';
 
 import { ConfigModel } from '../models/config.model';
 import { Field } from '../models/field.model';
+import { FieldType } from '../contracts/common';
 import { InitializationService } from './initialization.service';
 import { Input } from 'ky/distribution/types/options';
 import { MappingDefinition } from '../models/mapping-definition.model';
@@ -216,6 +217,82 @@ describe('MappingManagementService', () => {
     const field2 = mapping.getMappedFieldForIndex('1', true);
     service.isFieldSelectable(mapping, field2?.field!);
     expect(spy.calls.count()).toBe(1);
+  });
+
+  test('allows adding multiple collection children with the same parent', () => {
+    TestUtils.createMockDocs(service.cfg);
+    service.cfg.mappings = new MappingDefinition();
+    const srcDoc = service.cfg.sourceDocs[0];
+    const tgtDoc = service.cfg.targetDocs[0];
+    const collectionParent = srcDoc.getField('/sourceCollectionField<>')!;
+    collectionParent.isPrimitive = false;
+    collectionParent.type = FieldType.COMPLEX;
+
+    const firstChild = new Field();
+    firstChild.docDef = srcDoc;
+    firstChild.parentField = collectionParent;
+    firstChild.name = 'childOne';
+    firstChild.path = `${collectionParent.path}/childOne`;
+    firstChild.type = FieldType.STRING;
+    firstChild.isPrimitive = true;
+
+    const secondChild = new Field();
+    secondChild.docDef = srcDoc;
+    secondChild.parentField = collectionParent;
+    secondChild.name = 'childTwo';
+    secondChild.path = `${collectionParent.path}/childTwo`;
+    secondChild.type = FieldType.STRING;
+    secondChild.isPrimitive = true;
+    collectionParent.children.push(firstChild, secondChild);
+
+    const mapping = new MappingModel();
+    mapping.cfg = service.cfg;
+    mapping.addField(firstChild, true);
+    mapping.addField(tgtDoc.getField('/targetField')!, true);
+
+    expect(
+      service.isFieldAddableToMapping(secondChild, mapping)
+    ).toBeTruthy();
+  });
+
+  test('prevents adding collection fields from different parents', () => {
+    TestUtils.createMockDocs(service.cfg);
+    service.cfg.mappings = new MappingDefinition();
+    const srcDoc = service.cfg.sourceDocs[0];
+    const tgtDoc = service.cfg.targetDocs[0];
+    const firstParent = srcDoc.getField('/sourceCollectionField<>')!;
+    firstParent.isPrimitive = false;
+    firstParent.type = FieldType.COMPLEX;
+    const secondParent = srcDoc.getField('/sourceCollectionField2<>')!;
+    secondParent.isPrimitive = false;
+    secondParent.type = FieldType.COMPLEX;
+
+    const firstChild = new Field();
+    firstChild.docDef = srcDoc;
+    firstChild.parentField = firstParent;
+    firstChild.name = 'childOne';
+    firstChild.path = `${firstParent.path}/childOne`;
+    firstChild.type = FieldType.STRING;
+    firstChild.isPrimitive = true;
+
+    const secondChild = new Field();
+    secondChild.docDef = srcDoc;
+    secondChild.parentField = secondParent;
+    secondChild.name = 'childOther';
+    secondChild.path = `${secondParent.path}/childOther`;
+    secondChild.type = FieldType.STRING;
+    secondChild.isPrimitive = true;
+    firstParent.children.push(firstChild);
+    secondParent.children.push(secondChild);
+
+    const mapping = new MappingModel();
+    mapping.cfg = service.cfg;
+    mapping.addField(firstChild, true);
+    mapping.addField(tgtDoc.getField('/targetField')!, true);
+
+    expect(
+      service.isFieldAddableToMapping(secondChild, mapping)
+    ).toBeFalsy();
   });
 
   test('isFieldAddableToActiveMapping() - one-to-one/one-to-many', () => {

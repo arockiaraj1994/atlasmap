@@ -98,6 +98,7 @@ export class MappingManagementService {
     mappingDefinition: MappingDefinition
   ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
+      this.cfg.mappings = mappingDefinition;
       this.cfg.fileService
         .getCurrentMappingJson()
         .then(async (mappingJson: any) => {
@@ -105,7 +106,6 @@ export class MappingManagementService {
             resolve(false);
             return;
           }
-          this.cfg.mappings = mappingDefinition;
           MappingSerializer.deserializeMappingServiceJSON(
             mappingJson,
             this.cfg
@@ -418,9 +418,42 @@ export class MappingManagementService {
     }
     // adding a collection field
     if (field.isCollection || field.isInCollection()) {
-      return field.isSource()
-        ? mapping.sourceFields.length === 0
-        : mapping.targetFields.length === 0;
+      const mappedFields = mapping.getMappedFields(field.isSource());
+
+      if (mappedFields.length === 0) {
+        return true;
+      }
+
+      const collectionParent = field.isCollection
+        ? field
+        : field.getCollectionParentField();
+
+      if (!collectionParent) {
+        return false;
+      }
+
+      for (const mappedField of mappedFields) {
+        const mapped = mappedField.field;
+        if (!mapped || mapped instanceof PaddingField) {
+          continue;
+        }
+        const mappedInCollection =
+          mapped.isCollection || mapped.isInCollection();
+
+        if (!mappedInCollection) {
+          return false;
+        }
+
+        const mappedParent = mapped.isCollection
+          ? mapped
+          : mapped.getCollectionParentField();
+
+        if (mappedParent !== collectionParent) {
+          return false;
+        }
+      }
+
+      return true;
     }
 
     if (field.isSource()) {

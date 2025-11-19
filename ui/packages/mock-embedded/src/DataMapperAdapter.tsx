@@ -26,8 +26,9 @@ import { getCsvParameterOptions } from '@atlasmap/core';
 
 export interface IDataMapperAdapterProps {
   documentId: string;
+  mappingDefinitionId: number;
   inputDocuments: IExternalDocumentProps[];
-  outputDocument: IExternalDocumentProps;
+  outputDocument?: IExternalDocumentProps;
   initialMappings?: string;
   baseMappingServiceUrl: string;
   baseJavaInspectionServiceUrl: string;
@@ -51,6 +52,7 @@ export const DataMapperAdapter: React.FunctionComponent<
   IDataMapperAdapterProps
 > = ({
   documentId,
+  mappingDefinitionId,
   inputDocuments,
   outputDocument,
   initialMappings,
@@ -61,16 +63,24 @@ export const DataMapperAdapter: React.FunctionComponent<
   baseCSVInspectionServiceUrl,
   onMappings,
 }) => {
-  const externalDocument = React.useMemo(
-    () =>
-      ({
-        documentId,
-        initialMappings,
-        inputDocuments,
-        outputDocument,
-      } as IAtlasmapProviderProps['externalDocument']),
-    [initialMappings, documentId, inputDocuments, outputDocument],
-  );
+  const externalDocument = React.useMemo(() => {
+    const external: IAtlasmapProviderProps['externalDocument'] = {
+      documentId,
+      mappingDefinitionId,
+      initialMappings,
+      inputDocuments,
+    };
+    if (outputDocument) {
+      external.outputDocument = outputDocument;
+    }
+    return external;
+  }, [
+    documentId,
+    mappingDefinitionId,
+    initialMappings,
+    inputDocuments,
+    outputDocument,
+  ]);
   return (
     <AtlasmapProvider
       logLevel={'warn'}
@@ -83,9 +93,9 @@ export const DataMapperAdapter: React.FunctionComponent<
       onMappingChange={onMappings}
     >
       <Atlasmap
-        allowImport={false}
-        allowExport={false}
-        allowDelete={false}
+        allowImport={true}
+        allowExport={true}
+        allowDelete={true}
         allowCustomJavaClasses={false}
       />
     </AtlasmapProvider>

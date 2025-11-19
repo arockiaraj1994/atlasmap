@@ -137,8 +137,9 @@ export interface IAtlasmapProviderProps {
 
   externalDocument?: {
     documentId: string;
+    mappingDefinitionId?: number;
     inputDocuments: IExternalDocumentProps[];
-    outputDocument: IExternalDocumentProps;
+    outputDocument?: IExternalDocumentProps;
     initialMappings?: string;
   };
   onMappingChange?: (serializedMappings: string) => void;
@@ -213,23 +214,31 @@ export const AtlasmapProvider: FunctionComponent<IAtlasmapProviderProps> = ({
           cfg.addDocument(inputDoc);
         });
 
-        const outputDoc: DocumentInitializationModel =
-          new DocumentInitializationModel();
-        outputDoc.type = externalDocument.outputDocument.documentType;
-        outputDoc.inspectionType =
-          externalDocument.outputDocument.inspectionType;
-        outputDoc.inspectionSource =
-          externalDocument.outputDocument.inspectionSource;
-        outputDoc.inspectionParameters =
-          externalDocument.outputDocument.inspectionParameters;
-        outputDoc.inspectionResult =
-          externalDocument.outputDocument.inspectionResult;
-        outputDoc.id = externalDocument.outputDocument.id;
-        outputDoc.name = externalDocument.outputDocument.name;
-        outputDoc.description = externalDocument.outputDocument.description;
-        outputDoc.isSource = false;
-        outputDoc.showFields = externalDocument.outputDocument.showFields;
-        cfg.addDocument(outputDoc);
+        if (externalDocument.outputDocument) {
+          const outputDoc: DocumentInitializationModel =
+            new DocumentInitializationModel();
+          outputDoc.type = externalDocument.outputDocument.documentType;
+          outputDoc.inspectionType =
+            externalDocument.outputDocument.inspectionType;
+          outputDoc.inspectionSource =
+            externalDocument.outputDocument.inspectionSource;
+          outputDoc.inspectionParameters =
+            externalDocument.outputDocument.inspectionParameters;
+          outputDoc.inspectionResult =
+            externalDocument.outputDocument.inspectionResult;
+          outputDoc.id = externalDocument.outputDocument.id;
+          outputDoc.name = externalDocument.outputDocument.name;
+          outputDoc.description = externalDocument.outputDocument.description;
+          outputDoc.isSource = false;
+          outputDoc.showFields = externalDocument.outputDocument.showFields;
+          cfg.addDocument(outputDoc);
+        }
+
+        if (externalDocument.mappingDefinitionId !== undefined) {
+          cfg.mappingDefinitionId = Number(
+            externalDocument.mappingDefinitionId,
+          );
+        }
 
         if (externalDocument.initialMappings) {
           cfg.preloadedMappingJson = externalDocument.initialMappings;

@@ -68,7 +68,8 @@ export class FileManagementService {
     return new Promise<string[]>((resolve, reject) => {
       const url =
         this.cfg.initCfg.baseMappingServiceUrl +
-        'mappings' +
+        'mappings/' +
+        this.cfg.mappingDefinitionId +
         (filter == null ? '' : '?filter=' + filter);
       this.cfg.logger!.debug('Mapping List Request');
       this.api
@@ -127,7 +128,7 @@ export class FileManagementService {
     fileType: string
   ): Promise<Uint8Array | null> {
     return new Promise<Uint8Array | null>((resolve, reject) => {
-      const url = `${this.cfg.initCfg.baseMappingServiceUrl}mapping/${fileType}/`;
+      const url = `${this.cfg.initCfg.baseMappingServiceUrl}mapping/${fileType}/${this.cfg.mappingDefinitionId}`;
       this.cfg.logger!.debug(`Get Current ${fileName} Request: ${url}`);
       const headers = {
         'Content-Type': 'application/octet-stream',
@@ -164,7 +165,10 @@ export class FileManagementService {
    */
   resetMappings(): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/RESET';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/RESET/' +
+        this.cfg.mappingDefinitionId;
       this.cfg.logger!.debug('Reset Mappings Request');
       this.api
         .delete(url)
@@ -266,7 +270,10 @@ export class FileManagementService {
    */
   setMappingStringToService(jsonBuffer: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/JSON';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/JSON/' +
+        this.cfg.mappingDefinitionId;
       const headers = {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -316,7 +323,10 @@ export class FileManagementService {
         return;
       }
       // Update .../target/mappings/adm-catalog-files.gz
-      const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/GZ/0';
+      const url =
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/GZ/' +
+        this.cfg.mappingDefinitionId;
       const fileContent: Blob = new Blob([compressedBuffer], {
         type: 'application/octet-stream',
       });
@@ -331,7 +341,10 @@ export class FileManagementService {
   private setADMArchiveFileToService(
     compressedBuffer: BlobPart
   ): Promise<boolean> {
-    const url = this.cfg.initCfg.baseMappingServiceUrl + 'mapping/ZIP/';
+    const url =
+      this.cfg.initCfg.baseMappingServiceUrl +
+      'mapping/ZIP/' +
+      this.cfg.mappingDefinitionId;
     const fileContent: Blob = new Blob([compressedBuffer], {
       type: 'application/octet-stream',
     });
@@ -533,7 +546,9 @@ export class FileManagementService {
       }
       this.cfg.mappingFiles[0] = this.cfg.mappings.name!;
       const baseURL: string =
-        this.cfg.initCfg.baseMappingServiceUrl + 'mapping/JSON/';
+        this.cfg.initCfg.baseMappingServiceUrl +
+        'mapping/JSON/' +
+        this.cfg.mappingDefinitionId;
       this.cfg.logger!.debug('Get Current Mapping Request');
       this.api
         .get(baseURL)
