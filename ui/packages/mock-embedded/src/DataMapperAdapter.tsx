@@ -23,6 +23,7 @@ import {
   ParametersDialog,
 } from '@atlasmap/atlasmap';
 import { getCsvParameterOptions } from '@atlasmap/core';
+import { RepositoryAtlasmapToolbar } from './RepositoryAtlasmapToolbar';
 
 export interface IDataMapperAdapterProps {
   documentId: string;
@@ -97,6 +98,13 @@ export const DataMapperAdapter: React.FunctionComponent<
         allowExport={true}
         allowDelete={true}
         allowCustomJavaClasses={false}
+        toolbarOptions={{
+          showImportAtlasFileToolbarItem: false,
+          showImportJarFileToolbarItem: false,
+          showExportAtlasFileToolbarItem: false,
+          showResetToolbarItem: false,
+          extraToolbarContent: <RepositoryAtlasmapToolbar />,
+        }}
       />
     </AtlasmapProvider>
   );

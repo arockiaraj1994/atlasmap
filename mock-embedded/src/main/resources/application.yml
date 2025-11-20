@@ -38,3 +38,10 @@ resteasy:
   jaxrs:
     app:
       registration: beans
+
+mock:
+  embedded:
+    adm-repository:
+      # Configure the directory where ADM catalogs are stored. Can also be provided
+      # via the ADM_REPOSITORY_DIR environment variable.
+      directory: "/home/arockiaraj/Documents/mapping-repo/"

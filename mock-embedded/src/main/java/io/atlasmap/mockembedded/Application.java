@@ -19,16 +19,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import io.atlasmap.api.AtlasContextFactory;
 import io.atlasmap.core.DefaultAtlasContextFactory;
+import io.atlasmap.mockembedded.adm.AdmRepositoryProperties;
 
 /**
  * SpringBoot application.
  */
 @SpringBootApplication
+@EnableConfigurationProperties(AdmRepositoryProperties.class)
 public class Application extends SpringBootServletInitializer {
     private static final Logger LOG = LoggerFactory.getLogger(Application.class);
 

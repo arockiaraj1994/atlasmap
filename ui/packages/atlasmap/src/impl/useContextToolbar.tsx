@@ -25,7 +25,7 @@ import {
   ToggleTypesToolbarItem,
   ToggleUnmappedFieldsToolbarItem,
 } from './toolbarItems';
-import React, { useMemo, useState } from 'react';
+import React, { ReactNode, useMemo, useState } from 'react';
 
 import { ContextToolbar } from '../Layout';
 import { ToolbarGroup } from '@patternfly/react-core';
@@ -61,6 +61,7 @@ export interface IUseContextToolbarData {
   showToggleMappedFieldsToolbarItem?: boolean;
   showToggleUnmappedFieldsToolbarItem?: boolean;
   showAddNewMappingToolbarItem?: boolean;
+  extraToolbarContent?: ReactNode;
 }
 
 export function useContextToolbar({
@@ -78,6 +79,7 @@ export function useContextToolbar({
   showToggleMappedFieldsToolbarItem = true,
   showToggleUnmappedFieldsToolbarItem = true,
   showAddNewMappingToolbarItem = true,
+  extraToolbarContent,
 
   onImportADMArchiveFile,
   onImportJarFile,
@@ -106,6 +108,7 @@ export function useContextToolbar({
   const contextToolbar = useMemo(
     () => (
       <ContextToolbar>
+        {extraToolbarContent}
         {(showImportAtlasFileToolbarItem ||
           showImportJarFileToolbarItem ||
           showExportAtlasFileToolbarItem ||
@@ -222,6 +225,7 @@ export function useContextToolbar({
       toggleShowUnmappedFields,
       showAddNewMappingToolbarItem,
       newMapping,
+      extraToolbarContent,
     ],
   );
 

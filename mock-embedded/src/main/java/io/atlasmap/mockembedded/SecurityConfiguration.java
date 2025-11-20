@@ -35,7 +35,9 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.csrf().csrfTokenRepository(new AtlasMapXsrfRepository());
+        httpSecurity.csrf()
+                .ignoringAntMatchers("/mock/adm/**")
+                .csrfTokenRepository(new AtlasMapXsrfRepository());
         String disableFrameOptions = context.getEnvironment().getProperty(DISABLE_FRAME_OPTIONS);
         if (disableFrameOptions != null && "true".equals(disableFrameOptions)) {
             httpSecurity.headers().frameOptions().disable();
