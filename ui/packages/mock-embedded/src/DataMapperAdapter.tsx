@@ -64,6 +64,55 @@ export const DataMapperAdapter: React.FunctionComponent<
   baseCSVInspectionServiceUrl,
   onMappings,
 }) => {
+  const hiddenToolbarItems = React.useMemo(() => {
+    const fromEnv = process.env.REACT_APP_HIDE_TOOLBAR_ITEMS;
+    let raw = fromEnv;
+    if (!raw && typeof window !== 'undefined') {
+      raw =
+        new URLSearchParams(window.location.search).get('hideToolbarItems') ||
+        undefined;
+    }
+    return new Set(
+      (raw || '')
+        .split(',')
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  }, []);
+
+  const toolbarOptions = React.useMemo(
+    () => ({
+      showImportAtlasFileToolbarItem: false,
+      showImportJarFileToolbarItem: false,
+      showExportAtlasFileToolbarItem: false,
+      showResetToolbarItem: false,
+      showColumnMapperViewToolbarItem:
+        !hiddenToolbarItems.has('views') &&
+        !hiddenToolbarItems.has('columnview'),
+      showMappingTableViewToolbarItem:
+        !hiddenToolbarItems.has('views') &&
+        !hiddenToolbarItems.has('tableview'),
+      showNamespaceTableViewToolbarItem:
+        !hiddenToolbarItems.has('views') &&
+        !hiddenToolbarItems.has('namespaceview'),
+      showToggleMappingPreviewToolbarItem:
+        !hiddenToolbarItems.has('preview'),
+      showToggleTypesToolbarItem: !hiddenToolbarItems.has('types'),
+      showToggleMappedFieldsToolbarItem:
+        !hiddenToolbarItems.has('mapped') &&
+        !hiddenToolbarItems.has('mappedfields'),
+      showToggleUnmappedFieldsToolbarItem:
+        !hiddenToolbarItems.has('unmapped') &&
+        !hiddenToolbarItems.has('unmappedfields'),
+      showAddNewMappingToolbarItem:
+        !hiddenToolbarItems.has('add') &&
+        !hiddenToolbarItems.has('addmapping') &&
+        !hiddenToolbarItems.has('plus'),
+      extraToolbarContent: <RepositoryAtlasmapToolbar />,
+    }),
+    [hiddenToolbarItems],
+  );
+
   const externalDocument = React.useMemo(() => {
     const external: IAtlasmapProviderProps['externalDocument'] = {
       documentId,
@@ -98,13 +147,7 @@ export const DataMapperAdapter: React.FunctionComponent<
         allowExport={true}
         allowDelete={true}
         allowCustomJavaClasses={false}
-        toolbarOptions={{
-          showImportAtlasFileToolbarItem: false,
-          showImportJarFileToolbarItem: false,
-          showExportAtlasFileToolbarItem: false,
-          showResetToolbarItem: false,
-          extraToolbarContent: <RepositoryAtlasmapToolbar />,
-        }}
+        toolbarOptions={toolbarOptions}
       />
     </AtlasmapProvider>
   );

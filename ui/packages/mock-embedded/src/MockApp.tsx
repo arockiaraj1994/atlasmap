@@ -24,6 +24,16 @@ let receivedMappings: string;
 const mappingIdStorageKey = 'atlasmap.mock.mappingId';
 
 const MockApp: React.FC = () => {
+  const hideHeader = React.useMemo(() => {
+    if (process.env.REACT_APP_HIDE_MOCK_HEADER === 'true') {
+      return true;
+    }
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('hideHeader') === 'true';
+  }, []);
   const mappingDefinitionId = React.useMemo(() => {
     if (typeof window === 'undefined') {
       return Math.floor(Math.random() * 1000000);
@@ -43,22 +53,7 @@ const MockApp: React.FC = () => {
   }, []);
 
   return (
-    <Page
-      header={
-        <PageHeader
-          logo={
-            <>
-              <Brand
-                src={atlasmapLogo}
-                alt="AtlasMap Data Mapper UI"
-                height="40"
-              />
-            </>
-          }
-          style={{ minHeight: 40 }}
-        />
-      }
-    >
+    <Page>
       <PageSection
         variant={'light'}
         padding={{ default: 'noPadding' }}
