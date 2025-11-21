@@ -21,6 +21,7 @@ import {
   IAtlasmapProviderProps,
   IExternalDocumentProps,
   ParametersDialog,
+  useAtlasmap,
 } from '@atlasmap/atlasmap';
 import { getCsvParameterOptions } from '@atlasmap/core';
 import {
@@ -129,6 +130,8 @@ export const DataMapperAdapter: React.FunctionComponent<
     onImportDocument?: (file: File) => void;
     documentsCount?: number;
   }> = ({ isSource, onImportDocument, documentsCount }) => {
+    const { configModel, importInstanceSchema, documentExists } =
+      useAtlasmap();
     const [isOpen, setIsOpen] = React.useState(false);
     const [artifacts, setArtifacts] = React.useState<any[]>([]);
     const [groupedArtifacts, setGroupedArtifacts] = React.useState<
@@ -141,7 +144,6 @@ export const DataMapperAdapter: React.FunctionComponent<
     const [loadingArtifacts, setLoadingArtifacts] = React.useState(false);
     const [loadingVersions, setLoadingVersions] = React.useState(false);
     const [loadingImport, setLoadingImport] = React.useState(false);
-    const [artifactSelectOpen, setArtifactSelectOpen] = React.useState(false);
     const [versionSelectOpen, setVersionSelectOpen] = React.useState(false);
     const [error, setError] = React.useState<string>();
 
@@ -221,38 +223,10 @@ export const DataMapperAdapter: React.FunctionComponent<
       [baseUrl],
     );
 
-    const artifactOptions = React.useMemo(() => {
-      const opts: React.ReactElement[] = [];
-      if (!currentGroup) {
-        Object.keys(groupedArtifacts).forEach((group) => {
-          opts.push(
-            <SelectOption
-              key={`group::${group}`}
-              value={`group::${group}`}
-              description={`Group: ${group}`}
-            >
-              {group}
-            </SelectOption>,
-          );
-        });
-      } else {
-        opts.push(
-          <SelectOption key="__back" value="__back">
-            &larr; Back to groups
-          </SelectOption>,
-        );
-        (groupedArtifacts[currentGroup] || []).forEach((a) => {
-          const value = `${a.groupId || 'default'}::${a.id || a.artifactId}`;
-          const label = `${a.name || a.id || a.artifactId}`;
-          opts.push(
-            <SelectOption key={value} value={value} description={label}>
-              {label}
-            </SelectOption>,
-          );
-        });
-      }
-      return opts;
-    }, [currentGroup, groupedArtifacts]);
+    const groups = React.useMemo(
+      () => Object.keys(groupedArtifacts).sort(),
+      [groupedArtifacts],
+    );
 
     React.useEffect(() => {
       if (!isOpen) {
@@ -271,8 +245,8 @@ export const DataMapperAdapter: React.FunctionComponent<
     }, [artifacts, selectedArtifactId, loadVersions]);
 
     const handleLoad = async () => {
-      if (!onImportDocument) {
-        setError('Import is disabled.');
+      if (!importInstanceSchema || !configModel) {
+        setError('Import is unavailable.');
         return;
       }
       const artifact = artifacts.find(
@@ -303,27 +277,57 @@ export const DataMapperAdapter: React.FunctionComponent<
         const versionPath =
           versionChoice && versionChoice !== 'latest'
             ? `/versions/${encodeURIComponent(versionChoice)}`
-            : '';
+            : '/versions/latest';
         const artifactRes = await fetch(
           `${baseUrl}/apis/registry/v3/groups/${encodeURIComponent(
             groupId,
-          )}/artifacts/${encodeURIComponent(artifactId)}${versionPath}`,
+          )}/artifacts/${encodeURIComponent(artifactId)}${versionPath}/content`,
+          {
+            headers: {
+              Accept: 'application/json',
+            },
+          },
         );
         if (!artifactRes.ok) {
           throw new Error(await artifactRes.text());
         }
         const blob = await artifactRes.blob();
-        const mime = blob.type || '';
-        const ext = mime.includes('json')
-          ? 'json'
-          : mime.includes('xml')
-          ? 'xsd'
-          : 'txt';
-        const filename = `${
-          artifact.name || artifactId
-        }${versionPath ? `-${versionChoice}` : ''}.${ext}`;
-        const file = new File([blob], filename, { type: blob.type });
-        await onImportDocument(file);
+        const mime = blob.type || artifact.contentType || '';
+        const nameHint = artifact.name || artifactId;
+        const looksXml =
+          mime.includes('xml') ||
+          nameHint.toLowerCase().endsWith('.xsd') ||
+          nameHint.toLowerCase().includes('xml');
+        const looksJson =
+          mime.includes('json') ||
+          nameHint.toLowerCase().endsWith('.json') ||
+          nameHint.toLowerCase().includes('json');
+        const ext = looksXml ? 'xsd' : looksJson ? 'json' : 'json';
+        const filename = `${nameHint}${
+          versionPath ? `-${versionChoice}` : ''
+        }.${ext}`;
+        const fileType = looksXml
+          ? 'application/xml'
+          : 'application/schema+json';
+        const file = new File([blob], filename, { type: fileType });
+        if (documentsCount && documentsCount > 0) {
+          const proceed = window.confirm(
+            'A document is already loaded. Override with selection from the Schema Registry?',
+          );
+          if (!proceed) {
+            return;
+          }
+        }
+        const exists = documentExists(file, isSource);
+        if (exists) {
+          const proceed = window.confirm(
+            'A document with the same name exists. Import another copy?',
+          );
+          if (!proceed) {
+            return;
+          }
+        }
+        await importInstanceSchema(file, configModel, isSource, true);
         setIsOpen(false);
       } catch (e: any) {
         setError(`Unable to load from schema registry: ${e?.message || e}`);
@@ -340,46 +344,79 @@ export const DataMapperAdapter: React.FunctionComponent<
         headerContent="Load from Schema Registry"
         hasAutoWidth
         bodyContent={
-          <Form isWidthLimited style={{ minWidth: 320 }}>
+          <Form
+            isWidthLimited
+            style={{
+              minWidth: 340,
+              maxWidth: 420,
+              maxHeight: 520,
+              overflowY: 'auto',
+              paddingRight: 8,
+            }}
+          >
             <FormGroup label="Artifact" fieldId="sr-artifact">
               {loadingArtifacts ? (
                 <Spinner size="md" />
+              ) : !groups.length ? (
+                <Text component={TextVariants.small}>No artifacts available</Text>
               ) : (
-                <Select
-                  isOpen={artifactSelectOpen}
-                  onToggle={setArtifactSelectOpen}
-                  selections={
-                    selectedArtifactId ||
-                    (currentGroup ? `group::${currentGroup}` : undefined)
-                  }
-                  onSelect={(_, value) => {
-                    const val = value as string;
-                    if (val === '__back') {
-                      setCurrentGroup(undefined);
-                      setSelectedArtifactId(undefined);
-                      setSelectedVersion(undefined);
-                      setVersions([]);
-                      return;
-                    }
-                    if (val.startsWith('group::')) {
-                      const group = val.replace('group::', '');
-                      setCurrentGroup(group);
-                      setSelectedArtifactId(undefined);
-                      setSelectedVersion(undefined);
-                      setVersions([]);
-                      return;
-                    }
-                    setSelectedArtifactId(val);
-                    setSelectedVersion(undefined);
-                    setArtifactSelectOpen(false);
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
                   }}
-                  placeholderText={
-                    artifacts.length ? 'Select an artifact' : 'No artifacts available'
-                  }
-                  isDisabled={!artifacts.length}
                 >
-                  {artifactOptions}
-                </Select>
+                  {!currentGroup &&
+                    groups.map((group) => (
+                      <Button
+                        key={group}
+                        variant="link"
+                        onClick={() => {
+                          setCurrentGroup(group);
+                          setSelectedArtifactId(undefined);
+                          setSelectedVersion(undefined);
+                          setVersions([]);
+                        }}
+                        style={{ justifyContent: 'flex-start' }}
+                      >
+                        {group}
+                      </Button>
+                    ))}
+                  {currentGroup && (
+                    <>
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          setCurrentGroup(undefined);
+                          setSelectedArtifactId(undefined);
+                          setSelectedVersion(undefined);
+                          setVersions([]);
+                        }}
+                        style={{ justifyContent: 'flex-start' }}
+                      >
+                        &larr; Back to groups
+                      </Button>
+                      {(groupedArtifacts[currentGroup] || []).map((a) => {
+                        const value = `${a.groupId || 'default'}::${a.id || a.artifactId}`;
+                        const label = `${a.name || a.id || a.artifactId}`;
+                        return (
+                          <Button
+                            key={value}
+                            variant="link"
+                            onClick={() => {
+                              setSelectedArtifactId(value);
+                              setSelectedVersion(undefined);
+                            }}
+                            style={{ justifyContent: 'flex-start' }}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
               )}
             </FormGroup>
             <FormGroup label="Version" fieldId="sr-version">

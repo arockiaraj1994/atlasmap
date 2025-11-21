@@ -338,11 +338,7 @@ export const RepositoryAtlasmapToolbar: React.FC = () => {
 
   return (
     <>
-      <ToolbarGroup
-        variant="button-group"
-        spacer={{ default: 'spacerMd' }}
-        style={{ order: 99, marginLeft: 'auto' }}
-      >
+      <ToolbarGroup variant="button-group" spacer={{ default: 'spacerMd' }}>
         <Dropdown
           toggle={
             <DropdownToggle
@@ -364,6 +360,8 @@ export const RepositoryAtlasmapToolbar: React.FC = () => {
         title="Import a catalog from the repository"
         isOpen={importModalOpen}
         onClose={() => setImportModalOpen(false)}
+        variant="medium"
+        style={{ maxWidth: 720 }}
         actions={[
           <Button
             key="confirm"
@@ -423,6 +421,8 @@ export const RepositoryAtlasmapToolbar: React.FC = () => {
         title="Export current mappings to the repository"
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
+        variant="medium"
+        style={{ maxWidth: 520 }}
         actions={[
           <Button
             key="save"
