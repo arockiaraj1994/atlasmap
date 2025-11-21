@@ -1,18 +1,18 @@
 /*
-    Copyright (C) 2017 Red Hat, Inc.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-            http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-*/
+ * Copyright (C) 2017 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import * as React from 'react';
 
 import {
@@ -24,18 +24,9 @@ import {
   useAtlasmap,
 } from '@atlasmap/atlasmap';
 import { getCsvParameterOptions } from '@atlasmap/core';
-import {
-  Button,
-  Form,
-  FormGroup,
-  Popover,
-  Select,
-  SelectOption,
-  Spinner,
-  Text,
-  TextVariants,
-} from '@patternfly/react-core';
+import { Button, Modal, Text, TextContent } from '@patternfly/react-core';
 import { RepositoryAtlasmapToolbar } from './RepositoryAtlasmapToolbar';
+import { SchemaRegistryPicker } from './SchemaRegistryPicker';
 
 export interface IDataMapperAdapterProps {
   documentId: string;
@@ -107,8 +98,7 @@ export const DataMapperAdapter: React.FunctionComponent<
       showNamespaceTableViewToolbarItem:
         !hiddenToolbarItems.has('views') &&
         !hiddenToolbarItems.has('namespaceview'),
-      showToggleMappingPreviewToolbarItem:
-        !hiddenToolbarItems.has('preview'),
+      showToggleMappingPreviewToolbarItem: !hiddenToolbarItems.has('preview'),
       showToggleTypesToolbarItem: !hiddenToolbarItems.has('types'),
       showToggleMappedFieldsToolbarItem:
         !hiddenToolbarItems.has('mapped') &&
@@ -125,368 +115,91 @@ export const DataMapperAdapter: React.FunctionComponent<
     [hiddenToolbarItems],
   );
 
-  const SchemaRegistryAction: React.FC<{
+  const registryBaseUrl =
+    process.env.REACT_APP_SCHEMA_REGISTRY_BASE_URL?.trim() || '';
+
+  const RegistryHeaderAction: React.FC<{
     isSource: boolean;
-    onImportDocument?: (file: File) => void;
-    documentsCount?: number;
-  }> = ({ isSource, onImportDocument, documentsCount }) => {
-    const { configModel, importInstanceSchema, documentExists } =
-      useAtlasmap();
-    const [isOpen, setIsOpen] = React.useState(false);
-    const [artifacts, setArtifacts] = React.useState<any[]>([]);
-    const [groupedArtifacts, setGroupedArtifacts] = React.useState<
-      Record<string, any[]>
-    >({});
-    const [currentGroup, setCurrentGroup] = React.useState<string>();
-    const [versions, setVersions] = React.useState<string[]>([]);
-    const [selectedArtifactId, setSelectedArtifactId] = React.useState<string>();
-    const [selectedVersion, setSelectedVersion] = React.useState<string>();
-    const [loadingArtifacts, setLoadingArtifacts] = React.useState(false);
-    const [loadingVersions, setLoadingVersions] = React.useState(false);
-    const [loadingImport, setLoadingImport] = React.useState(false);
-    const [versionSelectOpen, setVersionSelectOpen] = React.useState(false);
-    const [error, setError] = React.useState<string>();
+  }> = ({ isSource }) => {
+    const { configModel, importInstanceSchema, documentExists } = useAtlasmap();
+    const [confirmOpen, setConfirmOpen] = React.useState(false);
+    const [pendingFile, setPendingFile] = React.useState<File | null>(null);
+    const confirmResolver = React.useRef<(ok: boolean) => void>();
 
-    const baseUrl =
-      process.env.REACT_APP_SCHEMA_REGISTRY_BASE_URL?.trim() || '';
-
-    const loadArtifacts = React.useCallback(async () => {
-      setError(undefined);
-      setLoadingArtifacts(true);
-      try {
-        const search = await fetch(
-          `${baseUrl}/apis/registry/v3/search/artifacts?orderby=groupId`,
-        );
-        if (!search.ok) {
-          throw new Error(await search.text());
-        }
-        const searchResult = await search.json();
-        const fetchedArtifacts = searchResult.artifacts || searchResult.items || [];
-        setArtifacts(fetchedArtifacts);
-        const grouped = fetchedArtifacts.reduce(
-          (acc: Record<string, any[]>, art: any) => {
-            const g = art.groupId || 'default';
-            acc[g] = acc[g] || [];
-            acc[g].push(art);
-            return acc;
-          },
-          {},
-        );
-        setGroupedArtifacts(grouped);
-        setCurrentGroup(undefined);
-        setSelectedArtifactId(undefined);
-        setSelectedVersion(undefined);
-        setVersions([]);
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load artifacts');
-      } finally {
-        setLoadingArtifacts(false);
+    const handleConfirm = React.useCallback(() => {
+      if (confirmResolver.current) {
+        confirmResolver.current(true);
       }
-    }, [baseUrl]);
+      setConfirmOpen(false);
+      setPendingFile(null);
+    }, []);
 
-    const loadVersions = React.useCallback(
-      async (artifact: any) => {
-        if (!artifact) {
-          setVersions([]);
-          return;
+    const handleCancel = React.useCallback(() => {
+      if (confirmResolver.current) {
+        confirmResolver.current(false);
+      }
+      setConfirmOpen(false);
+      setPendingFile(null);
+    }, []);
+
+    const shouldConfirmImport = React.useCallback(
+      async (file: File) => {
+        const needsConfirm = documentExists && documentExists(file, isSource);
+        if (!needsConfirm) {
+          return true;
         }
-        setError(undefined);
-        setLoadingVersions(true);
-        try {
-          const groupId = artifact.groupId || 'default';
-          const artifactId = artifact.id || artifact.artifactId;
-          const versionsRes = await fetch(
-            `${baseUrl}/apis/registry/v3/groups/${encodeURIComponent(
-              groupId,
-            )}/artifacts/${encodeURIComponent(artifactId)}/versions`,
-          );
-          if (!versionsRes.ok) {
-            throw new Error(await versionsRes.text());
-          }
-          const versionsJson = await versionsRes.json();
-          const rawVersions =
-            versionsJson.versions || versionsJson.items || versionsJson || [];
-          const normalized = Array.isArray(rawVersions)
-            ? rawVersions.map((v: any) => `${v.version || v}`)
-            : [];
-          setVersions(normalized);
-          if (normalized.length) {
-            setSelectedVersion(normalized[normalized.length - 1]);
-          }
-        } catch (e: any) {
-          setError(e?.message || 'Failed to load versions');
-          setVersions([]);
-        } finally {
-          setLoadingVersions(false);
-        }
+        setPendingFile(file);
+        setConfirmOpen(true);
+        return new Promise<boolean>((resolve) => {
+          confirmResolver.current = resolve;
+        });
       },
-      [baseUrl],
+      [documentExists, isSource],
     );
 
-    const groups = React.useMemo(
-      () => Object.keys(groupedArtifacts).sort(),
-      [groupedArtifacts],
-    );
-
-    React.useEffect(() => {
-      if (!isOpen) {
-        return;
-      }
-      loadArtifacts();
-    }, [isOpen, loadArtifacts]);
-
-    React.useEffect(() => {
-      const artifact = artifacts.find(
-        (a) =>
-          `${a.groupId || 'default'}::${a.id || a.artifactId}` ===
-          selectedArtifactId,
-      );
-      loadVersions(artifact);
-    }, [artifacts, selectedArtifactId, loadVersions]);
-
-    const handleLoad = async () => {
-      if (!importInstanceSchema || !configModel) {
-        setError('Import is unavailable.');
-        return;
-      }
-      const artifact = artifacts.find(
-        (a) =>
-          `${a.groupId || 'default'}::${a.id || a.artifactId}` ===
-          selectedArtifactId,
-      );
-      if (!artifact) {
-        setError('Select an artifact to load');
-        return;
-      }
-      const versionChoice = selectedVersion || 'latest';
-
-      if (documentsCount && documentsCount > 0) {
-        const proceed = window.confirm(
-          'A document is already loaded. Override with selection from the Schema Registry?',
-        );
-        if (!proceed) {
-          return;
-        }
-      }
-
-      setLoadingImport(true);
-      setError(undefined);
-      try {
-        const groupId = artifact.groupId || 'default';
-        const artifactId = artifact.id || artifact.artifactId;
-        const versionPath =
-          versionChoice && versionChoice !== 'latest'
-            ? `/versions/${encodeURIComponent(versionChoice)}`
-            : '/versions/latest';
-        const artifactRes = await fetch(
-          `${baseUrl}/apis/registry/v3/groups/${encodeURIComponent(
-            groupId,
-          )}/artifacts/${encodeURIComponent(artifactId)}${versionPath}/content`,
-          {
-            headers: {
-              Accept: 'application/json',
-            },
-          },
-        );
-        if (!artifactRes.ok) {
-          throw new Error(await artifactRes.text());
-        }
-        const blob = await artifactRes.blob();
-        const mime = blob.type || artifact.contentType || '';
-        const nameHint = artifact.name || artifactId;
-        const looksXml =
-          mime.includes('xml') ||
-          nameHint.toLowerCase().endsWith('.xsd') ||
-          nameHint.toLowerCase().includes('xml');
-        const looksJson =
-          mime.includes('json') ||
-          nameHint.toLowerCase().endsWith('.json') ||
-          nameHint.toLowerCase().includes('json');
-        const ext = looksXml ? 'xsd' : looksJson ? 'json' : 'json';
-        const filename = `${nameHint}${
-          versionPath ? `-${versionChoice}` : ''
-        }.${ext}`;
-        const fileType = looksXml
-          ? 'application/xml'
-          : 'application/schema+json';
-        const file = new File([blob], filename, { type: fileType });
-        if (documentsCount && documentsCount > 0) {
-          const proceed = window.confirm(
-            'A document is already loaded. Override with selection from the Schema Registry?',
-          );
-          if (!proceed) {
-            return;
-          }
-        }
-        const exists = documentExists(file, isSource);
-        if (exists) {
-          const proceed = window.confirm(
-            'A document with the same name exists. Import another copy?',
-          );
-          if (!proceed) {
-            return;
-          }
+    const handleImport = React.useCallback(
+      async (file: File) => {
+        if (!importInstanceSchema || !configModel) {
+          throw new Error('Import is unavailable.');
         }
         await importInstanceSchema(file, configModel, isSource, true);
-        setIsOpen(false);
-      } catch (e: any) {
-        setError(`Unable to load from schema registry: ${e?.message || e}`);
-      } finally {
-        setLoadingImport(false);
-      }
-    };
+      },
+      [configModel, importInstanceSchema, isSource],
+    );
 
     return (
-      <Popover
-        isVisible={isOpen}
-        shouldClose={() => setIsOpen(false)}
-        position="bottom-start"
-        headerContent="Load from Schema Registry"
-        hasAutoWidth
-        bodyContent={
-          <Form
-            isWidthLimited
-            style={{
-              minWidth: 340,
-              maxWidth: 420,
-              maxHeight: 520,
-              overflowY: 'auto',
-              paddingRight: 8,
-            }}
-          >
-            <FormGroup label="Artifact" fieldId="sr-artifact">
-              {loadingArtifacts ? (
-                <Spinner size="md" />
-              ) : !groups.length ? (
-                <Text component={TextVariants.small}>No artifacts available</Text>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  {!currentGroup &&
-                    groups.map((group) => (
-                      <Button
-                        key={group}
-                        variant="link"
-                        onClick={() => {
-                          setCurrentGroup(group);
-                          setSelectedArtifactId(undefined);
-                          setSelectedVersion(undefined);
-                          setVersions([]);
-                        }}
-                        style={{ justifyContent: 'flex-start' }}
-                      >
-                        {group}
-                      </Button>
-                    ))}
-                  {currentGroup && (
-                    <>
-                      <Button
-                        variant="link"
-                        onClick={() => {
-                          setCurrentGroup(undefined);
-                          setSelectedArtifactId(undefined);
-                          setSelectedVersion(undefined);
-                          setVersions([]);
-                        }}
-                        style={{ justifyContent: 'flex-start' }}
-                      >
-                        &larr; Back to groups
-                      </Button>
-                      {(groupedArtifacts[currentGroup] || []).map((a) => {
-                        const value = `${a.groupId || 'default'}::${a.id || a.artifactId}`;
-                        const label = `${a.name || a.id || a.artifactId}`;
-                        return (
-                          <Button
-                            key={value}
-                            variant="link"
-                            onClick={() => {
-                              setSelectedArtifactId(value);
-                              setSelectedVersion(undefined);
-                            }}
-                            style={{ justifyContent: 'flex-start' }}
-                          >
-                            {label}
-                          </Button>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              )}
-            </FormGroup>
-            <FormGroup label="Version" fieldId="sr-version">
-              {loadingVersions ? (
-                <Spinner size="md" />
-              ) : (
-                <Select
-                  isOpen={versionSelectOpen}
-                  onToggle={setVersionSelectOpen}
-                  selections={selectedVersion}
-                  onSelect={(_, value) => {
-                    setSelectedVersion(value as string);
-                    setVersionSelectOpen(false);
-                  }}
-                  placeholderText={
-                    versions.length ? 'Select a version' : 'No versions available'
-                  }
-                  isDisabled={!versions.length}
-                >
-                  {versions.map((v) => (
-                    <SelectOption key={v} value={v} />
-                  ))}
-                </Select>
-              )}
-            </FormGroup>
-            {error && (
-              <Text
-                component={TextVariants.small}
-                style={{ color: 'var(--pf-global--danger-color--100)' }}
-              >
-                {error}
-              </Text>
-            )}
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <Button
-                variant="primary"
-                onClick={handleLoad}
-                isDisabled={
-                  !selectedArtifactId ||
-                  loadingImport ||
-                  loadingArtifacts ||
-                  loadingVersions
-                }
-                isLoading={loadingImport}
-              >
-                Load
-              </Button>
-              <Button
-                variant="link"
-                onClick={() => setIsOpen(false)}
-                isDisabled={loadingImport}
-              >
-                Cancel
-              </Button>
-            </div>
-          </Form>
-        }
-        footerContent={null}
-        enableFlip
-      >
-        <Button
-          variant="control"
-          onClick={() => setIsOpen((v) => !v)}
-          isDisabled={loadingImport}
-          aria-label={`Load from Schema Registry (${isSource ? 'source' : 'target'})`}
-          style={{ marginLeft: 8 }}
+      <>
+        <SchemaRegistryPicker
+          isSource={isSource}
+          baseUrl={registryBaseUrl}
+          shouldConfirmImport={shouldConfirmImport}
+          onImport={handleImport}
+        />
+        <Modal
+          title="Override existing document?"
+          isOpen={confirmOpen}
+          onClose={handleCancel}
+          variant="small"
+          actions={[
+            <Button key="confirm" variant="primary" onClick={handleConfirm}>
+              OK
+            </Button>,
+            <Button key="cancel" variant="link" onClick={handleCancel}>
+              Cancel
+            </Button>,
+          ]}
         >
-          {loadingImport ? 'Loading...' : 'Load from Schema Registry'}
-        </Button>
-      </Popover>
+          <TextContent>
+            <Text>
+              A document is already loaded. Override with the selection from the
+              Schema Registry?
+            </Text>
+            {pendingFile ? (
+              <Text component="small">New document: {pendingFile.name}</Text>
+            ) : null}
+          </TextContent>
+        </Modal>
+      </>
     );
   };
 
@@ -525,8 +238,10 @@ export const DataMapperAdapter: React.FunctionComponent<
         allowDelete={true}
         allowCustomJavaClasses={false}
         toolbarOptions={toolbarOptions}
-        sourceHeaderActions={[<SchemaRegistryAction isSource key="sr-src" />]}
-        targetHeaderActions={[<SchemaRegistryAction isSource={false} key="sr-tgt" />]}
+        sourceHeaderActions={[<RegistryHeaderAction isSource key="sr-src" />]}
+        targetHeaderActions={[
+          <RegistryHeaderAction isSource={false} key="sr-tgt" />,
+        ]}
       />
     </AtlasmapProvider>
   );

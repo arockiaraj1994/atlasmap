@@ -5,6 +5,37 @@ html, body, #root {
   height: 100%;
 }
 
+/* Schema Registry popover sizing */
+.schema-registry-form {
+  min-width: 340px;
+  max-width: 420px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.schema-registry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schema-registry-btn {
+  justify-content: flex-start;
+  text-align: left;
+  padding: 6px 10px;
+}
+
+.schema-registry-btn.selected {
+  background: var(--pf-global--BackgroundColor--200);
+  border-color: var(--pf-global--active-color--100);
+}
+
+.schema-registry-back {
+  justify-content: flex-start;
+  padding: 6px 10px;
+}
+
 /* Ensure the Save/Load dropdown overlays other content */
 .pf-c-dropdown__menu,
 .pf-c-dropdown__menu-body {
