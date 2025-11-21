@@ -22,4 +22,11 @@ module.exports = function (app) {
       changeOrigin: true,
     }),
   );
+  app.use(
+    '/apis/registry',
+    createProxyMiddleware({
+      target: 'https://schema-registry-api-demo.batonsystems.com',
+      changeOrigin: true,
+    }),
+  );
 };

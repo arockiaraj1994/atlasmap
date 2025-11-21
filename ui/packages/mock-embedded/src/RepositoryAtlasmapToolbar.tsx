@@ -338,7 +338,11 @@ export const RepositoryAtlasmapToolbar: React.FC = () => {
 
   return (
     <>
-      <ToolbarGroup variant="button-group" spacer={{ default: 'spacerMd' }}>
+      <ToolbarGroup
+        variant="button-group"
+        spacer={{ default: 'spacerMd' }}
+        style={{ order: 99, marginLeft: 'auto' }}
+      >
         <Dropdown
           toggle={
             <DropdownToggle
@@ -346,7 +350,7 @@ export const RepositoryAtlasmapToolbar: React.FC = () => {
               onToggle={setDropdownOpen}
               data-testid="repository-atlasmap-toggle"
             >
-              AtlasMap
+              Save/Load Mappings
             </DropdownToggle>
           }
           isOpen={dropdownOpen}

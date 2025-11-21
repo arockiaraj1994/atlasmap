@@ -38,17 +38,24 @@ const MockApp: React.FC = () => {
     if (typeof window === 'undefined') {
       return Math.floor(Math.random() * 1000000);
     }
-    const existing = window.sessionStorage.getItem(mappingIdStorageKey);
-    if (existing) {
-      return Number(existing);
+    const inIframe = window.self !== window.top;
+    const reuseSession =
+      process.env.REACT_APP_REUSE_MOCK_MAPPING_ID !== 'false' && !inIframe;
+    if (reuseSession) {
+      const existing = window.sessionStorage.getItem(mappingIdStorageKey);
+      if (existing) {
+        return Number(existing);
+      }
     }
     const generated =
       Math.floor(Date.now() % 2000000000) +
       Math.floor(Math.random() * 1000);
-    window.sessionStorage.setItem(
-      mappingIdStorageKey,
-      generated.toString(),
-    );
+    if (reuseSession) {
+      window.sessionStorage.setItem(
+        mappingIdStorageKey,
+        generated.toString(),
+      );
+    }
     return generated;
   }, []);
 

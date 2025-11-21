@@ -4,3 +4,9 @@
 html, body, #root {
   height: 100%;
 }
+
+/* Ensure the Save/Load dropdown overlays other content */
+.pf-c-dropdown__menu,
+.pf-c-dropdown__menu-body {
+  z-index: 2000;
+}

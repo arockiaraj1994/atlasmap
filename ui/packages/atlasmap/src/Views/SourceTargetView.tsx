@@ -33,6 +33,8 @@ export interface ISourceTargetViewProps
   onSelectMapping: ISourceTargetLinksProps['onSelectMapping'];
   sourceEvents: ISourceColumnCallbacks;
   targetEvents: ITargetsColumnCallbacks;
+  sourceHeaderActions?: React.ReactElement[];
+  targetHeaderActions?: React.ReactElement[];
 }
 
 export const SourceTargetView: FunctionComponent<ISourceTargetViewProps> = ({
@@ -48,6 +50,8 @@ export const SourceTargetView: FunctionComponent<ISourceTargetViewProps> = ({
   onSelectMapping,
   sourceEvents,
   targetEvents,
+  sourceHeaderActions,
+  targetHeaderActions,
 }) => {
   return (
     <>
@@ -60,6 +64,7 @@ export const SourceTargetView: FunctionComponent<ISourceTargetViewProps> = ({
                 constants={constants}
                 sources={sources}
                 showTypes={showTypes}
+                extraHeaderActions={sourceHeaderActions}
                 {...sourceEvents}
               />
             </Column>
@@ -70,6 +75,7 @@ export const SourceTargetView: FunctionComponent<ISourceTargetViewProps> = ({
                 showMappingPreview={showMappingPreview}
                 showTypes={showTypes}
                 targets={targets}
+                extraHeaderActions={targetHeaderActions}
                 {...targetEvents}
               />
             </Column>

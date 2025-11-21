@@ -90,6 +90,7 @@ export interface ISourcesColumnData {
   constants?: IAtlasmapDocument | null;
   sources: Array<IAtlasmapDocument>;
   showTypes: boolean;
+  extraHeaderActions?: React.ReactElement[];
 }
 
 export const SourcesColumn: FunctionComponent<
@@ -126,6 +127,7 @@ export const SourcesColumn: FunctionComponent<
   constants,
   sources,
   showTypes,
+  extraHeaderActions = [],
 }) => {
   const renderPreview = useCallback(
     (field: IAtlasmapField) =>
@@ -145,6 +147,14 @@ export const SourcesColumn: FunctionComponent<
         title={'Source'}
         onSearch={onSearch}
         actions={[
+          ...extraHeaderActions.map((action, idx) =>
+            React.cloneElement(action, {
+              key: action.key ?? `extra-source-${idx}`,
+              onImportDocument,
+              isSource,
+              documentsCount: sources?.length ?? 0,
+            }),
+          ),
           onImportDocument && (
             <ImportAction
               id="Source"

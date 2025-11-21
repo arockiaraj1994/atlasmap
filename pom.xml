@@ -86,8 +86,8 @@
   </properties>
 
   <modules>
-    <module>parent</module>
-    <module>lib</module>
+    <!-- <module>parent</module>
+    <module>lib</module> -->
     <!-- <module>atlasmap-maven-plugin</module> -->
     <!-- <module>camel</module> -->
     <!-- <module>kafka-smt</module> -->

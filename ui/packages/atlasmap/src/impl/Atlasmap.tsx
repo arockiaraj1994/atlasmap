@@ -47,6 +47,8 @@ export interface IAtlasmapProps {
   allowCustomJavaClasses?: boolean;
   modalsContainerId?: string;
   toolbarOptions?: IUseContextToolbarData;
+  sourceHeaderActions?: React.ReactElement[];
+  targetHeaderActions?: React.ReactElement[];
 }
 
 export const Atlasmap: FunctionComponent<IAtlasmapProps> = ({
@@ -57,6 +59,8 @@ export const Atlasmap: FunctionComponent<IAtlasmapProps> = ({
   allowCustomJavaClasses = true,
   modalsContainerId = 'modals',
   toolbarOptions,
+  sourceHeaderActions,
+  targetHeaderActions,
 }) => {
   const {
     pending,
@@ -342,6 +346,8 @@ export const Atlasmap: FunctionComponent<IAtlasmapProps> = ({
             showTypes={showTypes}
             sourceEvents={sourceEvents}
             targetEvents={targetEvents}
+            sourceHeaderActions={sourceHeaderActions}
+            targetHeaderActions={targetHeaderActions}
           />
         );
       case 'MappingTable':

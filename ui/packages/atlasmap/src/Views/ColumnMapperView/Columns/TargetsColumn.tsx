@@ -85,6 +85,7 @@ export interface ITargetsColumnData {
   showMappingPreview: boolean;
   showTypes: boolean;
   targets: Array<IAtlasmapDocument>;
+  extraHeaderActions?: React.ReactElement[];
 }
 
 export const TargetsColumn: FunctionComponent<
@@ -116,6 +117,7 @@ export const TargetsColumn: FunctionComponent<
   targets,
   showTypes,
   targetProperties,
+  extraHeaderActions = [],
 }) => {
   const renderPreviewResult = useCallback(
     (field: IAtlasmapField) =>
@@ -130,6 +132,14 @@ export const TargetsColumn: FunctionComponent<
         title={'Target'}
         onSearch={onSearch}
         actions={[
+          ...extraHeaderActions.map((action, idx) =>
+            React.cloneElement(action, {
+              key: action.key ?? `extra-target-${idx}`,
+              onImportDocument,
+              isSource,
+              documentsCount: targets?.length ?? 0,
+            }),
+          ),
           onImportDocument && (
             <ImportAction
               id="Target"

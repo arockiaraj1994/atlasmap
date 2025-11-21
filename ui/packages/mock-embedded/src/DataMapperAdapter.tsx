@@ -23,6 +23,17 @@ import {
   ParametersDialog,
 } from '@atlasmap/atlasmap';
 import { getCsvParameterOptions } from '@atlasmap/core';
+import {
+  Button,
+  Form,
+  FormGroup,
+  Popover,
+  Select,
+  SelectOption,
+  Spinner,
+  Text,
+  TextVariants,
+} from '@patternfly/react-core';
 import { RepositoryAtlasmapToolbar } from './RepositoryAtlasmapToolbar';
 
 export interface IDataMapperAdapterProps {
@@ -113,6 +124,335 @@ export const DataMapperAdapter: React.FunctionComponent<
     [hiddenToolbarItems],
   );
 
+  const SchemaRegistryAction: React.FC<{
+    isSource: boolean;
+    onImportDocument?: (file: File) => void;
+    documentsCount?: number;
+  }> = ({ isSource, onImportDocument, documentsCount }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [artifacts, setArtifacts] = React.useState<any[]>([]);
+    const [groupedArtifacts, setGroupedArtifacts] = React.useState<
+      Record<string, any[]>
+    >({});
+    const [currentGroup, setCurrentGroup] = React.useState<string>();
+    const [versions, setVersions] = React.useState<string[]>([]);
+    const [selectedArtifactId, setSelectedArtifactId] = React.useState<string>();
+    const [selectedVersion, setSelectedVersion] = React.useState<string>();
+    const [loadingArtifacts, setLoadingArtifacts] = React.useState(false);
+    const [loadingVersions, setLoadingVersions] = React.useState(false);
+    const [loadingImport, setLoadingImport] = React.useState(false);
+    const [artifactSelectOpen, setArtifactSelectOpen] = React.useState(false);
+    const [versionSelectOpen, setVersionSelectOpen] = React.useState(false);
+    const [error, setError] = React.useState<string>();
+
+    const baseUrl =
+      process.env.REACT_APP_SCHEMA_REGISTRY_BASE_URL?.trim() || '';
+
+    const loadArtifacts = React.useCallback(async () => {
+      setError(undefined);
+      setLoadingArtifacts(true);
+      try {
+        const search = await fetch(
+          `${baseUrl}/apis/registry/v3/search/artifacts?orderby=groupId`,
+        );
+        if (!search.ok) {
+          throw new Error(await search.text());
+        }
+        const searchResult = await search.json();
+        const fetchedArtifacts = searchResult.artifacts || searchResult.items || [];
+        setArtifacts(fetchedArtifacts);
+        const grouped = fetchedArtifacts.reduce(
+          (acc: Record<string, any[]>, art: any) => {
+            const g = art.groupId || 'default';
+            acc[g] = acc[g] || [];
+            acc[g].push(art);
+            return acc;
+          },
+          {},
+        );
+        setGroupedArtifacts(grouped);
+        setCurrentGroup(undefined);
+        setSelectedArtifactId(undefined);
+        setSelectedVersion(undefined);
+        setVersions([]);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load artifacts');
+      } finally {
+        setLoadingArtifacts(false);
+      }
+    }, [baseUrl]);
+
+    const loadVersions = React.useCallback(
+      async (artifact: any) => {
+        if (!artifact) {
+          setVersions([]);
+          return;
+        }
+        setError(undefined);
+        setLoadingVersions(true);
+        try {
+          const groupId = artifact.groupId || 'default';
+          const artifactId = artifact.id || artifact.artifactId;
+          const versionsRes = await fetch(
+            `${baseUrl}/apis/registry/v3/groups/${encodeURIComponent(
+              groupId,
+            )}/artifacts/${encodeURIComponent(artifactId)}/versions`,
+          );
+          if (!versionsRes.ok) {
+            throw new Error(await versionsRes.text());
+          }
+          const versionsJson = await versionsRes.json();
+          const rawVersions =
+            versionsJson.versions || versionsJson.items || versionsJson || [];
+          const normalized = Array.isArray(rawVersions)
+            ? rawVersions.map((v: any) => `${v.version || v}`)
+            : [];
+          setVersions(normalized);
+          if (normalized.length) {
+            setSelectedVersion(normalized[normalized.length - 1]);
+          }
+        } catch (e: any) {
+          setError(e?.message || 'Failed to load versions');
+          setVersions([]);
+        } finally {
+          setLoadingVersions(false);
+        }
+      },
+      [baseUrl],
+    );
+
+    const artifactOptions = React.useMemo(() => {
+      const opts: React.ReactElement[] = [];
+      if (!currentGroup) {
+        Object.keys(groupedArtifacts).forEach((group) => {
+          opts.push(
+            <SelectOption
+              key={`group::${group}`}
+              value={`group::${group}`}
+              description={`Group: ${group}`}
+            >
+              {group}
+            </SelectOption>,
+          );
+        });
+      } else {
+        opts.push(
+          <SelectOption key="__back" value="__back">
+            &larr; Back to groups
+          </SelectOption>,
+        );
+        (groupedArtifacts[currentGroup] || []).forEach((a) => {
+          const value = `${a.groupId || 'default'}::${a.id || a.artifactId}`;
+          const label = `${a.name || a.id || a.artifactId}`;
+          opts.push(
+            <SelectOption key={value} value={value} description={label}>
+              {label}
+            </SelectOption>,
+          );
+        });
+      }
+      return opts;
+    }, [currentGroup, groupedArtifacts]);
+
+    React.useEffect(() => {
+      if (!isOpen) {
+        return;
+      }
+      loadArtifacts();
+    }, [isOpen, loadArtifacts]);
+
+    React.useEffect(() => {
+      const artifact = artifacts.find(
+        (a) =>
+          `${a.groupId || 'default'}::${a.id || a.artifactId}` ===
+          selectedArtifactId,
+      );
+      loadVersions(artifact);
+    }, [artifacts, selectedArtifactId, loadVersions]);
+
+    const handleLoad = async () => {
+      if (!onImportDocument) {
+        setError('Import is disabled.');
+        return;
+      }
+      const artifact = artifacts.find(
+        (a) =>
+          `${a.groupId || 'default'}::${a.id || a.artifactId}` ===
+          selectedArtifactId,
+      );
+      if (!artifact) {
+        setError('Select an artifact to load');
+        return;
+      }
+      const versionChoice = selectedVersion || 'latest';
+
+      if (documentsCount && documentsCount > 0) {
+        const proceed = window.confirm(
+          'A document is already loaded. Override with selection from the Schema Registry?',
+        );
+        if (!proceed) {
+          return;
+        }
+      }
+
+      setLoadingImport(true);
+      setError(undefined);
+      try {
+        const groupId = artifact.groupId || 'default';
+        const artifactId = artifact.id || artifact.artifactId;
+        const versionPath =
+          versionChoice && versionChoice !== 'latest'
+            ? `/versions/${encodeURIComponent(versionChoice)}`
+            : '';
+        const artifactRes = await fetch(
+          `${baseUrl}/apis/registry/v3/groups/${encodeURIComponent(
+            groupId,
+          )}/artifacts/${encodeURIComponent(artifactId)}${versionPath}`,
+        );
+        if (!artifactRes.ok) {
+          throw new Error(await artifactRes.text());
+        }
+        const blob = await artifactRes.blob();
+        const mime = blob.type || '';
+        const ext = mime.includes('json')
+          ? 'json'
+          : mime.includes('xml')
+          ? 'xsd'
+          : 'txt';
+        const filename = `${
+          artifact.name || artifactId
+        }${versionPath ? `-${versionChoice}` : ''}.${ext}`;
+        const file = new File([blob], filename, { type: blob.type });
+        await onImportDocument(file);
+        setIsOpen(false);
+      } catch (e: any) {
+        setError(`Unable to load from schema registry: ${e?.message || e}`);
+      } finally {
+        setLoadingImport(false);
+      }
+    };
+
+    return (
+      <Popover
+        isVisible={isOpen}
+        shouldClose={() => setIsOpen(false)}
+        position="bottom-start"
+        headerContent="Load from Schema Registry"
+        hasAutoWidth
+        bodyContent={
+          <Form isWidthLimited style={{ minWidth: 320 }}>
+            <FormGroup label="Artifact" fieldId="sr-artifact">
+              {loadingArtifacts ? (
+                <Spinner size="md" />
+              ) : (
+                <Select
+                  isOpen={artifactSelectOpen}
+                  onToggle={setArtifactSelectOpen}
+                  selections={
+                    selectedArtifactId ||
+                    (currentGroup ? `group::${currentGroup}` : undefined)
+                  }
+                  onSelect={(_, value) => {
+                    const val = value as string;
+                    if (val === '__back') {
+                      setCurrentGroup(undefined);
+                      setSelectedArtifactId(undefined);
+                      setSelectedVersion(undefined);
+                      setVersions([]);
+                      return;
+                    }
+                    if (val.startsWith('group::')) {
+                      const group = val.replace('group::', '');
+                      setCurrentGroup(group);
+                      setSelectedArtifactId(undefined);
+                      setSelectedVersion(undefined);
+                      setVersions([]);
+                      return;
+                    }
+                    setSelectedArtifactId(val);
+                    setSelectedVersion(undefined);
+                    setArtifactSelectOpen(false);
+                  }}
+                  placeholderText={
+                    artifacts.length ? 'Select an artifact' : 'No artifacts available'
+                  }
+                  isDisabled={!artifacts.length}
+                >
+                  {artifactOptions}
+                </Select>
+              )}
+            </FormGroup>
+            <FormGroup label="Version" fieldId="sr-version">
+              {loadingVersions ? (
+                <Spinner size="md" />
+              ) : (
+                <Select
+                  isOpen={versionSelectOpen}
+                  onToggle={setVersionSelectOpen}
+                  selections={selectedVersion}
+                  onSelect={(_, value) => {
+                    setSelectedVersion(value as string);
+                    setVersionSelectOpen(false);
+                  }}
+                  placeholderText={
+                    versions.length ? 'Select a version' : 'No versions available'
+                  }
+                  isDisabled={!versions.length}
+                >
+                  {versions.map((v) => (
+                    <SelectOption key={v} value={v} />
+                  ))}
+                </Select>
+              )}
+            </FormGroup>
+            {error && (
+              <Text
+                component={TextVariants.small}
+                style={{ color: 'var(--pf-global--danger-color--100)' }}
+              >
+                {error}
+              </Text>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <Button
+                variant="primary"
+                onClick={handleLoad}
+                isDisabled={
+                  !selectedArtifactId ||
+                  loadingImport ||
+                  loadingArtifacts ||
+                  loadingVersions
+                }
+                isLoading={loadingImport}
+              >
+                Load
+              </Button>
+              <Button
+                variant="link"
+                onClick={() => setIsOpen(false)}
+                isDisabled={loadingImport}
+              >
+                Cancel
+              </Button>
+            </div>
+          </Form>
+        }
+        footerContent={null}
+        enableFlip
+      >
+        <Button
+          variant="control"
+          onClick={() => setIsOpen((v) => !v)}
+          isDisabled={loadingImport}
+          aria-label={`Load from Schema Registry (${isSource ? 'source' : 'target'})`}
+          style={{ marginLeft: 8 }}
+        >
+          {loadingImport ? 'Loading...' : 'Load from Schema Registry'}
+        </Button>
+      </Popover>
+    );
+  };
+
   const externalDocument = React.useMemo(() => {
     const external: IAtlasmapProviderProps['externalDocument'] = {
       documentId,
@@ -148,6 +488,8 @@ export const DataMapperAdapter: React.FunctionComponent<
         allowDelete={true}
         allowCustomJavaClasses={false}
         toolbarOptions={toolbarOptions}
+        sourceHeaderActions={[<SchemaRegistryAction isSource key="sr-src" />]}
+        targetHeaderActions={[<SchemaRegistryAction isSource={false} key="sr-tgt" />]}
       />
     </AtlasmapProvider>
   );
